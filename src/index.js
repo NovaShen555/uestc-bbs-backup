@@ -70,6 +70,7 @@ const HEADERS = (env) => ({
 // 注意：这里多了一个 log 参数
 async function handleSchedule(env, log = console.log) {
   await log("🚀 开始执行同步任务...");
+  await log("authorization: " + env.BBS_AUTH);
   
   // 1. 获取最新帖子列表
   const topListUrl = "https://bbs.uestc.edu.cn/_/forum/toplist?idlist=newthread&page=1";
