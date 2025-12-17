@@ -23,6 +23,10 @@
 			"remote": true
 		}
 	],
+	"vars": {
+		"BBS_AUTH": "CZMSPJLsWPx42HRbBs0gBQ76pGD1HF90IOaWm0EzC/pO6nk1LVqReDVhtFtPzyelAf91auk0XySWYVioaSx+JM73iKx4HH/yznPT2Iu9O22GHPRkifgkYtOjM3KvnbJZB2iAg1qsjfFcp+yI8ynC",
+		"BBS_COOKIE": "newbbs_a0th=0_eAd4m7ZLzsmPNRLHc2OYeHwb;newbbs_auth=287452_wOrtnetzzsmPNRYWoZRwXfWr"
+	},
 	/**
 	 * Smart Placement
 	 * https://developers.cloudflare.com/workers/configuration/smart-placement/#smart-placement
