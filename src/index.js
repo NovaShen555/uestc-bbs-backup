@@ -296,8 +296,7 @@ async function renderHome(env) {
 // ==========================================
 // 帖子详情页渲染函数 (带自动回源抓取功能)
 // ==========================================
-
-async function renderThreadPage(env, threadId) {
+async function renderThread(env, threadId) {
   // 定义一个内部函数用于查询数据库，避免代码重复
   const queryDB = async () => {
     const tPromise = env.DB.prepare("SELECT * FROM threads WHERE thread_id = ?").bind(threadId).first();
