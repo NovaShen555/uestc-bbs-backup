@@ -292,32 +292,65 @@ async function renderHome(env) {
   return new Response(html, { headers: { "content-type": "text/html;charset=utf-8" } });
 }
 
-async function renderThread(env, threadId) {
-  // 1. 并行查询数据库
-  const threadPromise = env.DB.prepare("SELECT * FROM threads WHERE thread_id = ?").bind(threadId).first();
-  // 按楼层顺序 asc 查询所有评论
-  const commentsPromise = env.DB.prepare("SELECT * FROM comments WHERE thread_id = ? ORDER BY position ASC").bind(threadId).all();
 
-  const [thread, commentsData] = await Promise.all([threadPromise, commentsPromise]);
-  const comments = commentsData.results || [];
+// ==========================================
+// 帖子详情页渲染函数 (带自动回源抓取功能)
+// ==========================================
 
-  // 2. 处理 404 情况
+async function renderThreadPage(env, threadId) {
+  // 定义一个内部函数用于查询数据库，避免代码重复
+  const queryDB = async () => {
+    const tPromise = env.DB.prepare("SELECT * FROM threads WHERE thread_id = ?").bind(threadId).first();
+    const cPromise = env.DB.prepare("SELECT * FROM comments WHERE thread_id = ? ORDER BY position ASC").bind(threadId).all();
+    const [t, cData] = await Promise.all([tPromise, cPromise]);
+    return { 
+      thread: t, 
+      comments: cData.results || [] 
+    };
+  };
+
+  // 1. 第一次尝试：查询本地数据库
+  let { thread, comments } = await queryDB();
+
+  // 2. 如果本地没有，尝试“现场抓取”
+  if (!thread) {
+    console.log(`[LazyLoad] 本地未找到帖子 ${threadId}，正在尝试回源抓取...`);
+    try {
+      // 调用之前的爬虫逻辑 (processThread)
+      // 使用 console.log 作为日志输出，或者你可以传一个空函数 () => {} 保持静默
+      await processThread(env, threadId, console.log);
+      
+      // 3. 抓取完成后，第二次尝试：再次查询数据库
+      const newData = await queryDB();
+      thread = newData.thread;
+      comments = newData.comments;
+    } catch (e) {
+      console.error(`[LazyLoad] 抓取失败: ${e.message}`);
+    }
+  }
+
+  // 4. 如果尝试抓取后依然没有数据，说明源站也不存在或无法访问 -> 返回 404
   if (!thread) {
     const notFoundHtml = `
       <!DOCTYPE html>
       <html>
-      <head><meta charset="UTF-8"><title>帖子不存在</title></head>
-      <body style="text-align: center; padding: 50px; font-family: sans-serif; color: #666;">
-        <h1>404</h1>
-        <p>数据库中没有找到 ID 为 ${threadId} 的帖子备份。</p>
-        <a href="/" style="color: #0070f3; text-decoration: none;">返回首页</a>
+      <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>帖子不存在</title></head>
+      <body style="text-align: center; padding: 50px; font-family: -apple-system, sans-serif; color: #666; background-color: #f5f7fa;">
+        <div style="background: white; padding: 40px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); max-width: 500px; margin: 0 auto;">
+          <h1 style="color: #333; margin-top: 0;">404 Not Found</h1>
+          <p style="font-size: 1.1em; line-height: 1.6;">
+            数据库和源站中均未找到 ID 为 <strong>${threadId}</strong> 的帖子。<br>
+            <span style="font-size: 0.9em; color: #999;">(可能已被删除或权限不足)</span>
+          </p>
+          <a href="/" style="display: inline-block; margin-top: 20px; padding: 10px 20px; background: #0070f3; color: white; text-decoration: none; border-radius: 6px;">返回首页</a>
+        </div>
       </body>
       </html>
     `;
     return new Response(notFoundHtml, { status: 404, headers: { "content-type": "text/html;charset=utf-8" } });
   }
 
-  // 3. 构建 HTML
+  // 5. 构建 HTML (此时 thread 一定存在)
   const html = `
   <!DOCTYPE html>
   <html lang="zh-CN">
@@ -413,13 +446,8 @@ async function renderThread(env, threadId) {
             </div>
             <div class="post-content">
               ${
-                // 这里进行简单的内容处理。
-                // 注意：BBS原始内容可能包含 HTML，直接输出存在安全风险（XSS）。
-                // 但作为备份站，为了还原度，我们暂时直接输出。
-                // 生产环境中应该使用 sanitize-html 等库进行过滤。
                 (c.content || "")
-                  .replace(/\n/g, '<br>') // 处理换行
-                  // 处理简单的 BBCode 引用，使其样式更正常
+                  .replace(/\n/g, '<br>')
                   .replace(/\[quote\]/g, '<blockquote>').replace(/\[\/quote\]/g, '</blockquote>')
               }
             </div>
