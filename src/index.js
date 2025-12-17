@@ -13,7 +13,8 @@ export default {
 
     // 路由: 首页
     if (url.pathname === "/") {
-      return await renderHome(env);
+      const sort = url.searchParams.get("sort") || "created";
+      return await renderHome(env, sort);
     }
 
     // 路由: 帖子详情

@@ -1,62 +1,136 @@
 import { processThread, checkAndUpdateThread } from './crawler.js';
 
-export async function renderHome(env) {
+export async function renderHome(env, sort = "created") {
+  // 根据排序参数选择 SQL
+  const orderBy = sort === "reply" ? "last_synced DESC" : "created_at DESC";
   const { results } = await env.DB.prepare(
-    "SELECT * FROM threads ORDER BY thread_id DESC LIMIT 30"
+    `SELECT * FROM threads ORDER BY ${orderBy} LIMIT 50`
   ).all();
 
   const html = `
   <!DOCTYPE html>
-  <html>
+  <html lang="zh-CN">
   <head>
-    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>河畔监控台</title>
     <style>
-      body { font-family: -apple-system, sans-serif; max-width: 900px; margin: 0 auto; padding: 20px; }
-      .toolbar { background: #f0f0f0; padding: 15px; border-radius: 8px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }
-      button { background: #0070f3; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-size: 1rem; }
-      button:disabled { background: #ccc; cursor: not-allowed; }
-      button:hover:not(:disabled) { background: #005bb5; }
+      :root {
+        --primary-color: #0070f3;
+        --bg-color: #f5f7fa;
+        --text-color: #333;
+        --meta-color: #999;
+        --border-color: #eaeaea;
+      }
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        background-color: var(--bg-color);
+        color: var(--text-color);
+        margin: 0;
+        padding: 20px;
+        line-height: 1.6;
+      }
+      .container { max-width: 900px; margin: 0 auto; }
+
+      .page-header {
+        background: #fff; padding: 25px; border-radius: 12px; margin-bottom: 20px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.05); border-bottom: 3px solid var(--primary-color);
+      }
+      .page-header h1 { margin: 0; font-size: 1.8rem; color: #111; }
+
+      .toolbar {
+        background: #fff; padding: 15px 20px; border-radius: 10px; margin-bottom: 20px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.03); border: 1px solid var(--border-color);
+        display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;
+      }
+      .sort-tabs { display: flex; gap: 8px; }
+      .sort-tab {
+        padding: 8px 16px; border-radius: 6px; text-decoration: none;
+        font-size: 0.9rem; font-weight: 500; transition: all 0.2s;
+        border: 1px solid var(--border-color); background: #fff; color: var(--text-color);
+      }
+      .sort-tab:hover { background: #f8f9fa; }
+      .sort-tab.active {
+        background: var(--primary-color); color: #fff; border-color: var(--primary-color);
+      }
+
+      .btn {
+        background: var(--primary-color); color: white; border: none;
+        padding: 10px 20px; border-radius: 6px; cursor: pointer; font-size: 0.95rem; font-weight: 500;
+      }
+      .btn:disabled { background: #ccc; cursor: not-allowed; }
+      .btn:hover:not(:disabled) { background: #005bb5; }
+
       #console-output {
         background: #1e1e1e; color: #4af626; font-family: 'Consolas', 'Monaco', monospace;
-        padding: 15px; border-radius: 8px; margin-bottom: 20px;
+        padding: 15px; border-radius: 10px; margin-bottom: 20px;
         height: 200px; overflow-y: auto; white-space: pre-wrap; font-size: 0.9em;
-        display: none;
+        display: none; border: 1px solid #333;
       }
-      .thread-list { border: 1px solid #eee; border-radius: 8px; }
-      .thread-item { padding: 12px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; }
-      .thread-item:last-child { border-bottom: none; }
-      .meta { font-size: 0.8em; color: #666; margin-top: 4px; }
-      a { text-decoration: none; color: #0066cc; font-weight: 500; }
+
+      .thread-list { display: flex; flex-direction: column; gap: 12px; }
+      .thread-card {
+        background: #fff; border-radius: 10px; padding: 18px 20px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.03); border: 1px solid var(--border-color);
+        display: flex; justify-content: space-between; align-items: center;
+        transition: box-shadow 0.2s;
+      }
+      .thread-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+
+      .thread-info { flex: 1; min-width: 0; }
+      .thread-title {
+        font-size: 1.05rem; font-weight: 500; margin-bottom: 6px;
+        overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      }
+      .thread-title a { text-decoration: none; color: var(--text-color); }
+      .thread-title a:hover { color: var(--primary-color); }
+
+      .thread-meta { font-size: 0.85rem; color: var(--meta-color); display: flex; gap: 12px; flex-wrap: wrap; }
+      .thread-stats {
+        text-align: right; font-size: 0.85rem; color: var(--meta-color);
+        display: flex; flex-direction: column; gap: 4px; white-space: nowrap;
+      }
+      .reply-count { font-weight: 600; color: var(--primary-color); }
     </style>
   </head>
   <body>
-    <div class="toolbar">
-      <h2>🔥 河畔监控台</h2>
-      <button id="syncBtn">手动同步数据</button>
-    </div>
+    <div class="container">
+      <div class="page-header">
+        <h1>河畔监控台</h1>
+      </div>
 
-    <div id="console-output"></div>
+      <div class="toolbar">
+        <div class="sort-tabs">
+          <a href="/?sort=created" class="sort-tab ${sort === "created" ? "active" : ""}">按发帖时间</a>
+          <a href="/?sort=reply" class="sort-tab ${sort === "reply" ? "active" : ""}">按回复时间</a>
+        </div>
+        <button id="syncBtn" class="btn">手动同步数据</button>
+      </div>
 
-    <div class="thread-list">
-      ${results.map(t => `
-        <div class="thread-item">
-          <div>
-            <div><a href="/thread/${t.thread_id}">${t.subject}</a></div>
-            <div class="meta">
-              作者: ${t.author} • ${new Date(t.created_at * 1000).toLocaleString()}
+      <div id="console-output"></div>
+
+      <div class="thread-list">
+        ${results.map(t => `
+          <div class="thread-card">
+            <div class="thread-info">
+              <div class="thread-title"><a href="/thread/${t.thread_id}">${t.subject}</a></div>
+              <div class="thread-meta">
+                <span>作者: ${t.author}</span>
+                <span>发布于: ${new Date(t.created_at * 1000).toLocaleString('zh-CN')}</span>
+              </div>
+            </div>
+            <div class="thread-stats">
+              <span class="reply-count">${t.replies} 回复</span>
+              <span>${t.views || 0} 浏览</span>
             </div>
           </div>
-          <div class="meta">
-             回复: ${t.replies}
-          </div>
-        </div>
-      `).join('')}
+        `).join('')}
+      </div>
     </div>
 
     <script>
       document.addEventListener('DOMContentLoaded', () => {
-          document.getElementById('syncBtn').addEventListener('click', startSync);
+        document.getElementById('syncBtn').addEventListener('click', startSync);
       });
 
       async function startSync() {
@@ -84,7 +158,7 @@ export async function renderHome(env) {
             output.scrollTop = output.scrollHeight;
           }
         } catch (err) {
-          output.textContent += newline + "❌ 连接发生错误: " + err.message;
+          output.textContent += newline + "错误: " + err.message;
         } finally {
           btn.disabled = false;
           btn.textContent = "手动同步数据";
