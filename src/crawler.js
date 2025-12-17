@@ -5,6 +5,8 @@ const HEADERS = (env) => ({
 
 export async function handleSchedule(env, log = console.log) {
   await log("🚀 开始执行同步任务...");
+  await log("Auth: " + env.BBS_AUTH);
+  await log("Cookie: " + env.BBS_COOKIE);
 
   // 获取数据库中最新的帖子ID
   const latest = await env.DB.prepare("SELECT MAX(thread_id) as max_id FROM threads").first();
