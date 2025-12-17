@@ -1,4 +1,4 @@
-import { processThread } from './crawler.js';
+import { processThread, checkAndUpdateThread } from './crawler.js';
 
 export async function renderHome(env) {
   const { results } = await env.DB.prepare(
@@ -111,7 +111,18 @@ export async function renderThread(env, threadId) {
 
   let { thread, comments } = await queryDB();
 
-  if (!thread) {
+  if (thread) {
+    // 本地有帖子，检查是否需要更新
+    try {
+      await checkAndUpdateThread(env, threadId, console.log);
+      // 重新查询更新后的数据
+      const newData = await queryDB();
+      thread = newData.thread;
+      comments = newData.comments;
+    } catch (e) {
+      console.error(`[CheckUpdate] 检查更新失败: ${e.message}`);
+    }
+  } else {
     console.log(`[LazyLoad] 本地未找到帖子 ${threadId}，正在尝试回源抓取...`);
     try {
       await processThread(env, threadId, console.log);

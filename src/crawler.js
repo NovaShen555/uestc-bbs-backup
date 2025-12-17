@@ -112,6 +112,37 @@ async function syncNewReplies(env, log) {
   }
 }
 
+/**
+ * 检查帖子是否有更新（回复数是否一致），如有则增量更新
+ */
+export async function checkAndUpdateThread(env, threadId, log = console.log) {
+  // 获取数据库中的回复数
+  const dbThread = await env.DB.prepare("SELECT replies FROM threads WHERE thread_id = ?").bind(threadId).first();
+  const dbReplies = dbThread?.replies ?? -1;
+
+  // 如果帖子不存在，直接完整抓取
+  if (dbReplies < 0) {
+    await processThread(env, threadId, log);
+    return;
+  }
+
+  // 调用 API 获取最新回复数
+  const detailUrl = `https://bbs.uestc.edu.cn/_/post/list?thread_id=${threadId}&page=1&thread_details=1`;
+  const resp = await fetch(detailUrl, { headers: HEADERS(env) });
+  if (!resp.ok) return;
+
+  const json = await resp.json();
+  if (!json?.data?.thread) return;
+
+  const apiReplies = json.data.thread.replies ?? 0;
+
+  // 如果有新回复，增量更新
+  if (apiReplies > dbReplies) {
+    await log(`📝 [${threadId}] 发现新回复 (${dbReplies} -> ${apiReplies})，正在更新...`);
+    await updateThreadComments(env, threadId, apiReplies, dbReplies, log);
+  }
+}
+
 async function updateThreadComments(env, threadId, apiReplies, dbReplies, log) {
   // 计算需要从哪一页开始抓（每页假设20条）
   const startPage = Math.max(1, Math.floor(dbReplies / 20));
