@@ -291,3 +291,145 @@ async function renderHome(env) {
   
   return new Response(html, { headers: { "content-type": "text/html;charset=utf-8" } });
 }
+
+async function renderThread(env, threadId) {
+  // 1. 并行查询数据库
+  const threadPromise = env.DB.prepare("SELECT * FROM threads WHERE thread_id = ?").bind(threadId).first();
+  // 按楼层顺序 asc 查询所有评论
+  const commentsPromise = env.DB.prepare("SELECT * FROM comments WHERE thread_id = ? ORDER BY position ASC").bind(threadId).all();
+
+  const [thread, commentsData] = await Promise.all([threadPromise, commentsPromise]);
+  const comments = commentsData.results || [];
+
+  // 2. 处理 404 情况
+  if (!thread) {
+    const notFoundHtml = `
+      <!DOCTYPE html>
+      <html>
+      <head><meta charset="UTF-8"><title>帖子不存在</title></head>
+      <body style="text-align: center; padding: 50px; font-family: sans-serif; color: #666;">
+        <h1>404</h1>
+        <p>数据库中没有找到 ID 为 ${threadId} 的帖子备份。</p>
+        <a href="/" style="color: #0070f3; text-decoration: none;">返回首页</a>
+      </body>
+      </html>
+    `;
+    return new Response(notFoundHtml, { status: 404, headers: { "content-type": "text/html;charset=utf-8" } });
+  }
+
+  // 3. 构建 HTML
+  const html = `
+  <!DOCTYPE html>
+  <html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${thread.subject} - 河畔备份</title>
+    <style>
+      :root {
+        --primary-color: #0070f3;
+        --bg-color: #f5f7fa;
+        --text-color: #333;
+        --meta-color: #999;
+        --border-color: #eaeaea;
+      }
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        background-color: var(--bg-color);
+        color: var(--text-color);
+        margin: 0;
+        padding: 20px;
+        line-height: 1.6;
+      }
+      .container {
+        max-width: 900px;
+        margin: 0 auto;
+      }
+      /* 头部导航和标题 */
+      .nav-bar { margin-bottom: 20px; }
+      .nav-bar a { text-decoration: none; color: var(--primary-color); font-weight: 500; }
+      .thread-header {
+        background: #fff; padding: 25px; border-radius: 12px; margin-bottom: 30px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.05); border-bottom: 3px solid var(--primary-color);
+      }
+      .thread-header h1 { margin: 0 0 15px 0; font-size: 1.8rem; color: #111; }
+      .thread-info { color: var(--meta-color); font-size: 0.9rem; display: flex; gap: 15px; flex-wrap: wrap; }
+
+      /* 楼层列表 */
+      .post-card {
+        background: #fff; border-radius: 10px; padding: 20px; margin-bottom: 20px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.03); border: 1px solid var(--border-color);
+      }
+      /* 楼主特殊样式 */
+      .post-card.is-landlord { border-left: 3px solid var(--primary-color); }
+
+      .post-meta {
+        display: flex; justify-content: space-between; align-items: center;
+        margin-bottom: 15px; padding-bottom: 12px; border-bottom: 1px solid var(--border-color); font-size: 0.9rem;
+      }
+      .author-info { display: flex; align-items: center; gap: 10px; }
+      .floor-tag {
+        background: #eaf4ff; color: var(--primary-color); padding: 2px 8px;
+        border-radius: 4px; font-weight: bold; font-size: 0.85rem;
+      }
+      .post-time { color: var(--meta-color); }
+
+      /* 内容区域样式优化 */
+      .post-content { font-size: 1.05rem; overflow-wrap: break-word; }
+      .post-content img { max-width: 100%; height: auto; border-radius: 4px; margin: 10px 0; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+      /* 模拟 BBS 引用样式 */
+      blockquote {
+        background: #f8f9fa; border-left: 4px solid #ccc; margin: 15px 0; padding: 12px 16px; color: #555; font-size: 0.95rem;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="nav-bar">
+        <a href="/">&larr; 返回帖子列表</a>
+      </div>
+
+      <div class="thread-header">
+        <h1>${thread.subject}</h1>
+        <div class="thread-info">
+          <span>ID: ${thread.thread_id}</span>
+          <span>楼主: <strong>${thread.author}</strong></span>
+          <span>回复数: ${thread.replies}</span>
+          <span>发布于: ${new Date(thread.created_at * 1000).toLocaleString('zh-CN')}</span>
+        </div>
+      </div>
+
+      <div class="post-list">
+        ${comments.map(c => `
+          <div class="post-card ${c.position === 1 ? 'is-landlord' : ''}" id="post-${c.position}">
+            <div class="post-meta">
+              <div class="author-info">
+                <span class="floor-tag">${c.position === 1 ? '楼主' : '#' + c.position}</span>
+                <strong style="font-size: 1rem;">${c.author}</strong>
+              </div>
+              <div class="post-time">
+                ${new Date(c.post_date * 1000).toLocaleString('zh-CN')}
+              </div>
+            </div>
+            <div class="post-content">
+              ${
+                // 这里进行简单的内容处理。
+                // 注意：BBS原始内容可能包含 HTML，直接输出存在安全风险（XSS）。
+                // 但作为备份站，为了还原度，我们暂时直接输出。
+                // 生产环境中应该使用 sanitize-html 等库进行过滤。
+                (c.content || "")
+                  .replace(/\n/g, '<br>') // 处理换行
+                  // 处理简单的 BBCode 引用，使其样式更正常
+                  .replace(/\[quote\]/g, '<blockquote>').replace(/\[\/quote\]/g, '</blockquote>')
+              }
+            </div>
+          </div>
+        `).join('')}
+      </div>
+
+    </div>
+  </body>
+  </html>`;
+
+  return new Response(html, { headers: { "content-type": "text/html;charset=utf-8" } });
+}
