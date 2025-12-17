@@ -173,22 +173,16 @@ async function renderHome(env) {
     <title>河畔监控台</title>
     <style>
       body { font-family: -apple-system, sans-serif; max-width: 900px; margin: 0 auto; padding: 20px; }
-      
-      /* 顶部控制栏样式 */
       .toolbar { background: #f0f0f0; padding: 15px; border-radius: 8px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }
       button { background: #0070f3; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-size: 1rem; }
       button:disabled { background: #ccc; cursor: not-allowed; }
       button:hover:not(:disabled) { background: #005bb5; }
-
-      /* 日志终端样式 */
       #console-output {
         background: #1e1e1e; color: #4af626; font-family: 'Consolas', 'Monaco', monospace;
         padding: 15px; border-radius: 8px; margin-bottom: 20px;
         height: 200px; overflow-y: auto; white-space: pre-wrap; font-size: 0.9em;
-        display: none; /* 默认隐藏 */
+        display: none;
       }
-
-      /* 帖子列表样式 */
       .thread-list { border: 1px solid #eee; border-radius: 8px; }
       .thread-item { padding: 12px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; }
       .thread-item:last-child { border-bottom: none; }
@@ -199,7 +193,7 @@ async function renderHome(env) {
   <body>
     <div class="toolbar">
       <h2>🔥 河畔监控台</h2>
-      <button id="syncBtn" onclick="startSync()">手动同步数据</button>
+      <button id="syncBtn">手动同步数据</button>
     </div>
 
     <div id="console-output"></div>
@@ -221,98 +215,48 @@ async function renderHome(env) {
     </div>
 
     <script>
+      // 使用 DOMContentLoaded 确保页面加载完毕
+      document.addEventListener('DOMContentLoaded', () => {
+          document.getElementById('syncBtn').addEventListener('click', startSync);
+      });
+
       async function startSync() {
         const btn = document.getElementById('syncBtn');
         const output = document.getElementById('console-output');
         
-        // 1. 初始化 UI
         btn.disabled = true;
         btn.textContent = "正在同步...";
         output.style.display = "block";
-        output.textContent = "> 正在连接 Worker 实例...\n";
+        
+        // 这里的换行符处理是关键，使用 String.fromCharCode(10) 避免转义错误
+        const newline = String.fromCharCode(10);
+        output.textContent = "> 正在连接 Worker 实例..." + newline;
 
         try {
-          // 2. 发起请求
           const response = await fetch('/sync');
           const reader = response.body.getReader();
           const decoder = new TextDecoder();
 
-          // 3. 循环读取流数据
           while (true) {
             const { done, value } = await reader.read();
             if (done) break;
             
-            // 解码并追加到控制台
             const text = decoder.decode(value);
+            // 追加文本
             output.textContent += text;
-            output.scrollTop = output.scrollHeight; // 自动滚动到底部
+            output.scrollTop = output.scrollHeight;
           }
         } catch (err) {
-          output.textContent += "\\n❌ 连接发生错误: " + err.message;
+          output.textContent += newline + "❌ 连接发生错误: " + err.message;
         } finally {
-          // 4. 恢复状态
           btn.disabled = false;
           btn.textContent = "手动同步数据";
-          output.textContent += "\\n> 任务结束。建议刷新页面查看最新数据。";
+          output.textContent += newline + "> 任务结束。建议刷新页面查看最新数据。";
         }
       }
     </script>
   </body>
   </html>`;
   
-  return new Response(html, { headers: { "content-type": "text/html;charset=utf-8" } });
-}
-
-// renderThread 函数保持不变...
-// (请将上一条回答中的 renderThread 函数完整粘贴在这里，不需要改动)
-async function renderThread(env, threadId) {
-  // 查帖子详情
-  const thread = await env.DB.prepare("SELECT * FROM threads WHERE thread_id = ?").bind(threadId).first();
-  const { results: comments } = await env.DB.prepare(
-    "SELECT * FROM comments WHERE thread_id = ? ORDER BY position ASC"
-  ).bind(threadId).all();
-
-  if (!thread) return new Response("Thread not found in DB", { status: 404 });
-
-  const html = `
-  <!DOCTYPE html>
-  <html>
-  <head>
-    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>${thread.subject}</title>
-    <style>
-      body { font-family: -apple-system, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; background: #f9f9f9; }
-      .header { margin-bottom: 20px; border-bottom: 2px solid #ddd; padding-bottom: 10px; }
-      .post { background: #fff; padding: 15px; margin-bottom: 15px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
-      .post-meta { font-size: 0.85em; color: #888; margin-bottom: 10px; border-bottom: 1px solid #eee; padding-bottom: 5px; }
-      .floor-num { font-weight: bold; color: #333; }
-      .content { line-height: 1.6; word-break: break-all; }
-      blockquote { background: #f0f0f0; border-left: 4px solid #ccc; margin: 10px 0; padding: 10px; font-size: 0.9em; }
-    </style>
-  </head>
-  <body>
-    <div class="header">
-      <h2>${thread.subject}</h2>
-      <p>ID: ${thread.thread_id} | <a href="/">返回列表</a></p>
-    </div>
-    
-    ${comments.map(c => `
-      <div class="post">
-        <div class="post-meta">
-          <span class="floor-num">#${c.position}</span> 
-          ${c.author} 
-          (${new Date(c.post_date * 1000).toLocaleString()})
-        </div>
-        <div class="content">
-          ${c.content 
-            .replace(/\n/g, '<br>') 
-            .replace(/\[quote\]/g, '<blockquote>').replace(/\[\/quote\]/g, '</blockquote>') 
-          }
-        </div>
-      </div>
-    `).join('')}
-  </body>
-  </html>`;
-
   return new Response(html, { headers: { "content-type": "text/html;charset=utf-8" } });
 }
