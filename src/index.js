@@ -104,17 +104,43 @@ async function processThread(env, threadId, log) {
   // 请求帖子详情
   const detailUrl = `https://bbs.uestc.edu.cn/_/post/list?thread_id=${threadId}&page=1&thread_details=1&forum_details=1`;
   const resp = await fetch(detailUrl, { headers: HEADERS(env) });
-  if (!resp.ok) return;
+  
+  if (!resp.ok) {
+    // 如果是 404 或 403，说明帖子可能被删或没权限，跳过不报错
+    if (resp.status === 404 || resp.status === 403) {
+      await log(`⚠️ [${threadId}] 无法访问 (Status: ${resp.status})，跳过。`);
+      return;
+    }
+    throw new Error(`API 请求失败: ${resp.status}`);
+  }
 
   const json = await resp.json();
+  
+  // 安全检查：防止 data 为 null
+  if (!json || !json.data) {
+    await log(`⚠️ [${threadId}] 返回数据格式异常，跳过。`);
+    return;
+  }
+
   const threadInfo = json.data.thread;
   const comments = json.data.rows;
 
-  if (!threadInfo || !comments) return;
+  // 如果没有帖子信息或楼层信息，跳过
+  if (!threadInfo || !comments) {
+    await log(`⚠️ [${threadId}] 数据不完整 (无 thread 或 rows)，跳过。`);
+    return;
+  }
 
   const stmts = [];
 
-  // A. 帖子主表
+  // ---------------------------------------------------------
+  // 关键修改：使用 ?? 运算符给所有字段加默认值
+  // undefined ?? null 结果是 null (D1 接受 null)
+  // undefined ?? 0 结果是 0
+  // undefined ?? "" 结果是 空字符串
+  // ---------------------------------------------------------
+
+  // A. 帖子主表 (Threads)
   stmts.push(env.DB.prepare(`
     INSERT INTO threads (thread_id, subject, author, views, replies, created_at, last_synced)
     VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -124,15 +150,15 @@ async function processThread(env, threadId, log) {
       last_synced=excluded.last_synced
   `).bind(
     threadInfo.thread_id,
-    threadInfo.subject,
-    threadInfo.author,
-    threadInfo.views,
-    threadInfo.replies,
-    threadInfo.dateline,
+    threadInfo.subject ?? "无标题",       // 防止标题丢失
+    threadInfo.author ?? "未知用户",      // 防止作者丢失 (如匿名)
+    threadInfo.views ?? 0,               // 防止 undefined
+    threadInfo.replies ?? 0,
+    threadInfo.dateline ?? 0,
     Math.floor(Date.now() / 1000)
   ));
 
-  // B. 楼层表
+  // B. 楼层表 (Comments)
   for (const row of comments) {
     stmts.push(env.DB.prepare(`
       INSERT INTO comments (post_id, thread_id, position, author, content, post_date, is_first, raw_json)
@@ -143,18 +169,22 @@ async function processThread(env, threadId, log) {
     `).bind(
       row.post_id,
       threadInfo.thread_id,
-      row.position,
-      row.author,
-      row.message,
-      row.dateline,
-      row.is_first,
+      row.position ?? 0,
+      row.author ?? "未知用户",
+      row.message ?? "",                 // 关键：防止内容为空导致的报错
+      row.dateline ?? 0,
+      row.is_first ?? 0,                 // 关键：防止 is_first 缺失
       JSON.stringify(row)
     ));
   }
 
   // C. 写入数据库
-  await env.DB.batch(stmts);
-  await log(`✅ [${threadId}] 同步成功 - 标题: ${threadInfo.subject.substring(0, 15)}... (共${comments.length}楼)`);
+  if (stmts.length > 0) {
+    await env.DB.batch(stmts);
+    // 截取标题前15个字符用于日志显示
+    const safeSubject = (threadInfo.subject ?? "").substring(0, 15);
+    await log(`✅ [${threadId}] 同步成功 - 标题: ${safeSubject}... (共${comments.length}楼)`);
+  }
 }
 
 // ==========================================
