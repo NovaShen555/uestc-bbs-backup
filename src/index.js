@@ -62,15 +62,15 @@ export default {
 // ==========================================
 
 const HEADERS = (env) => ({
-  "accept": "application/json",
   "authorization": env.BBS_AUTH,
-  "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+  "Cookie": env.BBS_COOKIE,
 });
 
 // 注意：这里多了一个 log 参数
 async function handleSchedule(env, log = console.log) {
   await log("🚀 开始执行同步任务...");
   await log("authorization: " + env.BBS_AUTH);
+  await log("Cookie: " + env.BBS_COOKIE);
   
   // 1. 获取最新帖子列表
   const topListUrl = "https://bbs.uestc.edu.cn/_/forum/toplist?idlist=newthread&page=1";
