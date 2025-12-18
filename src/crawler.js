@@ -3,28 +3,39 @@ const HEADERS = (env) => ({
   "Cookie": env.BBS_COOKIE,
 });
 
+// Cloudflare Workers 每个请求最多 50 个 subrequests，需要限制并发
+const MAX_CONCURRENT = 5;
+const MAX_PAGES_PER_UPDATE = 3;
+
+// 批次处理帮助函数
+async function processBatch(items, batchSize, handler) {
+  for (let i = 0; i < items.length; i += batchSize) {
+    const batch = items.slice(i, i + batchSize);
+    await Promise.all(batch.map(handler));
+  }
+}
+
 export async function handleSchedule(env, log = console.log) {
-  await log("🚀 开始执行同步任务...");
-  await log("Auth: " + env.BBS_AUTH);
-  await log("Cookie: " + env.BBS_COOKIE);
+  await log("开始执行同步任务...");
 
   // 获取数据库中最新的帖子ID
   const latest = await env.DB.prepare("SELECT MAX(thread_id) as max_id FROM threads").first();
   const latestId = latest?.max_id || 0;
-  await log(`📌 数据库最新帖子ID: ${latestId}`);
+  await log(`数据库最新帖子ID: ${latestId}`);
 
   let page = 1;
   let allThreads = [];
   let foundExisting = false;
+  let hasMoreNewThreads = false;
 
-  // 翻页获取，直到找到已有帖子
-  while (!foundExisting) {
+  // 翻页获取，直到找到已有帖子（限制最多3页，避免请求过多）
+  while (!foundExisting && page <= 3) {
     const topListUrl = `https://bbs.uestc.edu.cn/_/forum/toplist?idlist=newthread&page=${page}`;
     await log(`正在请求 Toplist 第${page}页...`);
 
     const listResp = await fetch(topListUrl, { headers: HEADERS(env) });
     if (!listResp.ok) {
-      await log(`❌ Toplist 请求失败: ${listResp.status}`);
+      await log(`Toplist 请求失败: ${listResp.status}`);
       break;
     }
 
@@ -32,7 +43,7 @@ export async function handleSchedule(env, log = console.log) {
     const threads = listData.data.newthread || [];
 
     if (threads.length === 0) {
-      await log("⚠️ 没有更多帖子了");
+      await log("没有更多帖子了");
       break;
     }
 
@@ -45,42 +56,54 @@ export async function handleSchedule(env, log = console.log) {
     }
 
     page++;
-    if (page > 100) break; // 安全限制
   }
 
+  let processedNewThreads = 0;
   if (allThreads.length === 0) {
-    return log("⚠️ 没有发现新帖子");
+    await log("没有发现新帖子");
+  } else {
+    // 限制最多处理 15 个新帖
+    const toProcess = allThreads.slice(0, 15);
+    hasMoreNewThreads = allThreads.length > 15;
+    await log(`共发现 ${allThreads.length} 个新帖，本次处理 ${toProcess.length} 个...`);
+
+    // 批次处理，每批 MAX_CONCURRENT 个
+    await processBatch(toProcess, MAX_CONCURRENT, async (t) => {
+      try {
+        await processThread(env, t.thread_id, log);
+        processedNewThreads++;
+      } catch (e) {
+        await log(`处理帖子 ${t.thread_id} 失败: ${e.message}`);
+      }
+    });
+
+    await log("新帖同步完成。");
   }
-
-  await log(`📊 共发现 ${allThreads.length} 个新帖，开始并发获取详情...`);
-
-  const tasks = allThreads.map(async (t) => {
-    try {
-      await processThread(env, t.thread_id, log);
-    } catch (e) {
-      await log(`❌ 处理帖子 ${t.thread_id} 失败: ${e.message}`);
-    }
-  });
-
-  await Promise.all(tasks);
-  await log("🏁 新帖同步完成。");
 
   // 同步新回复
-  await syncNewReplies(env, log);
-  await log("🏁 所有同步任务结束。");
+  const { hasMoreReplies, updatedCount } = await syncNewReplies(env, log);
+
+  const hasMore = hasMoreNewThreads || hasMoreReplies;
+  await log("所有同步任务结束。");
+
+  return { hasMore, processedNewThreads, updatedReplies: updatedCount };
 }
 
 async function syncNewReplies(env, log) {
-  await log("📝 开始同步新回复...");
+  await log("开始同步新回复...");
 
   let page = 1;
-  while (page <= 20) {
+  let totalUpdated = 0;
+  let hasMoreReplies = false;
+
+  // 限制最多翻 2 页，每页处理有限数量
+  while (page <= 2 && totalUpdated < 10) {
     const url = `https://bbs.uestc.edu.cn/_/forum/toplist?idlist=newreply&page=${page}`;
     await log(`正在请求 newreply 第${page}页...`);
 
     const resp = await fetch(url, { headers: HEADERS(env) });
     if (!resp.ok) {
-      await log(`❌ newreply 请求失败: ${resp.status}`);
+      await log(`newreply 请求失败: ${resp.status}`);
       break;
     }
 
@@ -89,11 +112,19 @@ async function syncNewReplies(env, log) {
     if (threads.length === 0) break;
 
     let needUpdate = 0;
+    let skippedDueToLimit = 0;
+
     for (const t of threads) {
       const dbThread = await env.DB.prepare("SELECT replies FROM threads WHERE thread_id = ?").bind(t.thread_id).first();
       const dbReplies = dbThread?.replies ?? -1;
 
       if (t.replies > dbReplies) {
+        if (totalUpdated >= 10) {
+          // 还有更多需要更新的，但达到了本次限制
+          skippedDueToLimit++;
+          continue;
+        }
+
         if (dbReplies < 0) {
           // 帖子不存在，完整抓取
           await processThread(env, t.thread_id, log);
@@ -101,15 +132,24 @@ async function syncNewReplies(env, log) {
           await updateThreadComments(env, t.thread_id, t.replies, dbReplies, log);
         }
         needUpdate++;
+        totalUpdated++;
       }
     }
 
-    if (needUpdate === 0) {
-      await log("✅ 整页无需更新，停止翻页");
+    // 如果因为限制跳过了一些，说明还有更多
+    if (skippedDueToLimit > 0) {
+      hasMoreReplies = true;
+    }
+
+    if (needUpdate === 0 && skippedDueToLimit === 0) {
+      await log("整页无需更新，停止翻页");
       break;
     }
     page++;
   }
+
+  await log(`回复同步完成，共更新 ${totalUpdated} 个帖子`);
+  return { hasMoreReplies, updatedCount: totalUpdated };
 }
 
 /**
@@ -138,7 +178,7 @@ export async function checkAndUpdateThread(env, threadId, log = console.log) {
 
   // 如果有新回复，增量更新
   if (apiReplies > dbReplies) {
-    await log(`📝 [${threadId}] 发现新回复 (${dbReplies} -> ${apiReplies})，正在更新...`);
+    await log(`[${threadId}] 发现新回复 (${dbReplies} -> ${apiReplies})，正在更新...`);
     await updateThreadComments(env, threadId, apiReplies, dbReplies, log);
   }
 }
@@ -150,7 +190,8 @@ async function updateThreadComments(env, threadId, apiReplies, dbReplies, log) {
   let allNewComments = [];
   let page = startPage;
 
-  while (page <= 100) {
+  // 限制最多抓取 MAX_PAGES_PER_UPDATE 页，避免请求过多
+  while (page <= startPage + MAX_PAGES_PER_UPDATE) {
     const url = `https://bbs.uestc.edu.cn/_/post/list?thread_id=${threadId}&page=${page}&thread_details=1`;
     const resp = await fetch(url, { headers: HEADERS(env) });
     if (!resp.ok) break;
@@ -191,7 +232,7 @@ async function updateThreadComments(env, threadId, apiReplies, dbReplies, log) {
     .bind(apiReplies, Math.floor(Date.now() / 1000), threadId));
 
   await env.DB.batch(stmts);
-  await log(`✅ [${threadId}] 新增 ${allNewComments.length} 条评论`);
+  await log(`[${threadId}] 新增 ${allNewComments.length} 条评论`);
 }
 
 export async function processThread(env, threadId, log) {
@@ -200,7 +241,7 @@ export async function processThread(env, threadId, log) {
 
   if (!resp.ok) {
     if (resp.status === 404 || resp.status === 403) {
-      await log(`⚠️ [${threadId}] 无法访问 (Status: ${resp.status})，跳过。`);
+      await log(`[${threadId}] 无法访问 (Status: ${resp.status})，跳过。`);
       return;
     }
     throw new Error(`API 请求失败: ${resp.status}`);
@@ -209,7 +250,7 @@ export async function processThread(env, threadId, log) {
   const json = await resp.json();
 
   if (!json || !json.data) {
-    await log(`⚠️ [${threadId}] 返回数据格式异常，跳过。`);
+    await log(`[${threadId}] 返回数据格式异常，跳过。`);
     return;
   }
 
@@ -217,7 +258,7 @@ export async function processThread(env, threadId, log) {
   const comments = json.data.rows;
 
   if (!threadInfo || !comments) {
-    await log(`⚠️ [${threadId}] 数据不完整 (无 thread 或 rows)，跳过。`);
+    await log(`[${threadId}] 数据不完整 (无 thread 或 rows)，跳过。`);
     return;
   }
 
@@ -262,6 +303,6 @@ export async function processThread(env, threadId, log) {
   if (stmts.length > 0) {
     await env.DB.batch(stmts);
     const safeSubject = (threadInfo.subject ?? "").substring(0, 15);
-    await log(`✅ [${threadId}] 同步成功 - 标题: ${safeSubject}... (共${comments.length}楼)`);
+    await log(`[${threadId}] 同步成功 - 标题: ${safeSubject}... (共${comments.length}楼)`);
   }
 }

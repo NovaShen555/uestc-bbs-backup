@@ -130,39 +130,64 @@ export async function renderHome(env, sort = "created") {
 
     <script>
       document.addEventListener('DOMContentLoaded', () => {
-        document.getElementById('syncBtn').addEventListener('click', startSync);
+        document.getElementById('syncBtn').addEventListener('click', () => startSync());
       });
 
-      async function startSync() {
+      async function startSync(round = 1) {
         const btn = document.getElementById('syncBtn');
         const output = document.getElementById('console-output');
+        const newline = String.fromCharCode(10);
 
         btn.disabled = true;
-        btn.textContent = "正在同步...";
         output.style.display = "block";
 
-        const newline = String.fromCharCode(10);
-        output.textContent = "> 正在连接 Worker 实例..." + newline;
+        if (round === 1) {
+          btn.textContent = "正在同步...";
+          output.textContent = "> 开始同步..." + newline;
+        } else {
+          btn.textContent = \`正在同步 (第\${round}轮)...\`;
+          output.textContent += newline + \`> ===== 第 \${round} 轮同步 =====\` + newline;
+        }
+
+        let shouldContinue = false;
 
         try {
           const response = await fetch('/sync');
           const reader = response.body.getReader();
           const decoder = new TextDecoder();
+          let fullText = "";
 
           while (true) {
             const { done, value } = await reader.read();
             if (done) break;
 
             const text = decoder.decode(value);
+            fullText += text;
             output.textContent += text;
             output.scrollTop = output.scrollHeight;
           }
+
+          // 检查是否需要继续同步
+          if (fullText.includes("[SYNC_MORE]")) {
+            shouldContinue = true;
+          }
         } catch (err) {
           output.textContent += newline + "错误: " + err.message;
-        } finally {
+        }
+
+        if (shouldContinue && round < 20) {
+          // 短暂延迟后继续下一轮
+          output.textContent += newline + "> 检测到还有更多内容，1秒后继续..." + newline;
+          await new Promise(r => setTimeout(r, 1000));
+          await startSync(round + 1);
+        } else {
           btn.disabled = false;
           btn.textContent = "手动同步数据";
-          output.textContent += newline + "> 任务结束。建议刷新页面查看最新数据。";
+          if (round >= 20) {
+            output.textContent += newline + "> 已达到最大轮次限制 (20轮)，请稍后再试。";
+          } else {
+            output.textContent += newline + "> 同步完成！建议刷新页面查看最新数据。";
+          }
         }
       }
     </script>

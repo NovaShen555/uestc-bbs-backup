@@ -37,8 +37,14 @@ export default {
 
       ctx.waitUntil(
         handleSchedule(env, streamLog)
-          .then(() => writer.write(encoder.encode("✅ 同步任务全部完成！\n")))
-          .catch((err) => writer.write(encoder.encode(`❌ 发生错误: ${err}\n`)))
+          .then((result) => {
+            if (result?.hasMore) {
+              writer.write(encoder.encode("[SYNC_MORE] 还有更多内容待同步...\n"));
+            } else {
+              writer.write(encoder.encode("[SYNC_DONE] 同步任务全部完成！\n"));
+            }
+          })
+          .catch((err) => writer.write(encoder.encode(`[SYNC_ERROR] 发生错误: ${err}\n`)))
           .finally(() => writer.close())
       );
 
