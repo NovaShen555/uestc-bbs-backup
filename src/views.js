@@ -30,10 +30,37 @@ export async function renderHome(env, sort = "created") {
       :root {
         --primary-color: #0070f3;
         --bg-color: #f5f7fa;
+        --card-bg: #fff;
         --text-color: #333;
+        --text-secondary: #111;
         --meta-color: #999;
         --border-color: #eaeaea;
         --sidebar-width: 380px;
+        --hover-bg: #f8f9fa;
+        --quote-bg: #f8f9fa;
+        --quote-color: #555;
+        --floor-bg: #eaf4ff;
+        --error-bg: #fff5f5;
+        --error-border: #ffccc7;
+        --error-color: #cf1322;
+        --active-bg: #f8faff;
+      }
+      [data-theme="dark"] {
+        --primary-color: #3b9eff;
+        --bg-color: #1a1a2e;
+        --card-bg: #16213e;
+        --text-color: #e4e4e7;
+        --text-secondary: #f4f4f5;
+        --meta-color: #9ca3af;
+        --border-color: #374151;
+        --hover-bg: #1e3a5f;
+        --quote-bg: #1e293b;
+        --quote-color: #94a3b8;
+        --floor-bg: #1e3a5f;
+        --error-bg: #450a0a;
+        --error-border: #991b1b;
+        --error-color: #fca5a5;
+        --active-bg: #1e3a5f;
       }
       * { box-sizing: border-box; }
       body {
@@ -96,31 +123,46 @@ export async function renderHome(env, sort = "created") {
 
       /* 页面头部 */
       .page-header {
-        background: #fff; padding: 20px; border-radius: 12px; margin-bottom: 15px;
+        background: var(--card-bg); padding: 20px; border-radius: 12px; margin-bottom: 15px;
         box-shadow: 0 4px 12px rgba(0,0,0,0.05); border-bottom: 3px solid var(--primary-color);
       }
       .sidebar.collapsed .page-header { padding: 15px; }
-      .page-header h1 { margin: 0; font-size: 1.6rem; color: #111; }
+      .page-header h1 { margin: 0; font-size: 1.6rem; color: var(--text-secondary); }
       .sidebar.collapsed .page-header h1 { font-size: 1.2rem; }
       .page-header .sync-time { font-size: 0.8rem; color: var(--meta-color); margin-top: 6px; }
 
       /* 工具栏 */
       .toolbar {
-        background: #fff; padding: 12px 15px; border-radius: 10px; margin-bottom: 15px;
+        background: var(--card-bg); padding: 12px 15px; border-radius: 10px; margin-bottom: 15px;
         box-shadow: 0 2px 8px rgba(0,0,0,0.03); border: 1px solid var(--border-color);
         display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;
       }
+      .toolbar-left { display: flex; gap: 6px; align-items: center; }
+      .toolbar-right { display: flex; gap: 6px; align-items: center; }
       .sort-tabs { display: flex; gap: 6px; }
       .sort-tab {
         padding: 6px 12px; border-radius: 6px; text-decoration: none;
         font-size: 0.85rem; font-weight: 500; transition: all 0.2s;
-        border: 1px solid var(--border-color); background: #fff; color: var(--text-color);
+        border: 1px solid var(--border-color); background: var(--card-bg); color: var(--text-color);
         cursor: pointer;
       }
-      .sort-tab:hover { background: #f8f9fa; }
+      .sort-tab:hover { background: var(--hover-bg); }
       .sort-tab.active {
         background: var(--primary-color); color: #fff; border-color: var(--primary-color);
       }
+
+      /* 主题切换按钮 */
+      .theme-toggle {
+        width: 36px; height: 36px; border-radius: 8px; border: 1px solid var(--border-color);
+        background: var(--card-bg); cursor: pointer; display: flex; align-items: center; justify-content: center;
+        transition: all 0.2s; color: var(--text-color);
+      }
+      .theme-toggle:hover { background: var(--hover-bg); }
+      .theme-toggle svg { width: 18px; height: 18px; }
+      .theme-toggle .icon-sun { display: none; }
+      .theme-toggle .icon-moon { display: block; }
+      [data-theme="dark"] .theme-toggle .icon-sun { display: block; }
+      [data-theme="dark"] .theme-toggle .icon-moon { display: none; }
 
       .btn {
         background: var(--primary-color); color: white; border: none;
@@ -141,7 +183,7 @@ export async function renderHome(env, sort = "created") {
       /* 帖子列表 */
       .thread-list { display: flex; flex-direction: column; gap: 8px; }
       .thread-card {
-        background: #fff; border-radius: 8px; padding: 12px 15px;
+        background: var(--card-bg); border-radius: 8px; padding: 12px 15px;
         box-shadow: 0 2px 6px rgba(0,0,0,0.03); border: 1px solid var(--border-color);
         cursor: pointer; transition: all 0.2s;
       }
@@ -152,7 +194,7 @@ export async function renderHome(env, sort = "created") {
       .thread-card.active {
         border-color: var(--primary-color);
         border-left: 3px solid var(--primary-color);
-        background: #f8faff;
+        background: var(--active-bg);
       }
 
       .thread-title {
@@ -178,14 +220,14 @@ export async function renderHome(env, sort = "created") {
       .content-placeholder svg { width: 80px; height: 80px; margin-bottom: 20px; opacity: 0.3; }
 
       .thread-header {
-        background: #fff; padding: 20px; border-radius: 12px; margin-bottom: 20px;
+        background: var(--card-bg); padding: 20px; border-radius: 12px; margin-bottom: 20px;
         box-shadow: 0 4px 12px rgba(0,0,0,0.05); border-bottom: 3px solid var(--primary-color);
       }
-      .thread-header h1 { margin: 0 0 12px 0; font-size: 1.5rem; color: #111; }
+      .thread-header h1 { margin: 0 0 12px 0; font-size: 1.5rem; color: var(--text-secondary); }
       .thread-info { color: var(--meta-color); font-size: 0.85rem; display: flex; gap: 12px; flex-wrap: wrap; }
 
       .post-card {
-        background: #fff; border-radius: 10px; padding: 16px; margin-bottom: 12px;
+        background: var(--card-bg); border-radius: 10px; padding: 16px; margin-bottom: 12px;
         box-shadow: 0 2px 8px rgba(0,0,0,0.03); border: 1px solid var(--border-color);
       }
       .post-card.is-landlord { border-left: 3px solid var(--primary-color); }
@@ -196,16 +238,19 @@ export async function renderHome(env, sort = "created") {
       }
       .author-info { display: flex; align-items: center; gap: 8px; }
       .floor-tag {
-        background: #eaf4ff; color: var(--primary-color); padding: 2px 6px;
+        background: var(--floor-bg); color: var(--primary-color); padding: 2px 6px;
         border-radius: 4px; font-weight: bold; font-size: 0.8rem;
       }
       .post-time { color: var(--meta-color); font-size: 0.8rem; }
-      .post-id { color: #bbb; font-size: 0.75rem; margin-left: 8px; }
+      .post-id { color: var(--meta-color); font-size: 0.75rem; margin-left: 8px; }
 
       .post-content { font-size: 1rem; overflow-wrap: break-word; }
       .post-content img { max-width: 100%; height: auto; border-radius: 4px; margin: 8px 0; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+      .post-content img.emoji { display: inline; width: auto; height: 1.5em; margin: 0 2px; vertical-align: middle; box-shadow: none; border-radius: 0; }
+      .post-content a { color: var(--primary-color); }
+      .post-content .attachment-placeholder { color: var(--meta-color); font-style: italic; }
       blockquote {
-        background: #f8f9fa; border-left: 4px solid #ccc; margin: 12px 0; padding: 10px 14px; color: #555; font-size: 0.9rem;
+        background: var(--quote-bg); border-left: 4px solid var(--border-color); margin: 12px 0; padding: 10px 14px; color: var(--quote-color); font-size: 0.9rem;
       }
 
       .loading-spinner {
@@ -219,8 +264,8 @@ export async function renderHome(env, sort = "created") {
       @keyframes spin { to { transform: rotate(360deg); } }
 
       .error-message {
-        background: #fff5f5; border: 1px solid #ffccc7; border-radius: 8px;
-        padding: 20px; text-align: center; color: #cf1322;
+        background: var(--error-bg); border: 1px solid var(--error-border); border-radius: 8px;
+        padding: 20px; text-align: center; color: var(--error-color);
       }
 
       /* 返回/关闭按钮 */
@@ -251,11 +296,23 @@ export async function renderHome(env, sort = "created") {
           </div>
 
           <div class="toolbar">
-            <div class="sort-tabs">
-              <span class="sort-tab ${sort === "created" ? "active" : ""}" data-sort="created">按发帖时间</span>
-              <span class="sort-tab ${sort === "reply" ? "active" : ""}" data-sort="reply">按回复时间</span>
+            <div class="toolbar-left">
+              <div class="sort-tabs">
+                <span class="sort-tab ${sort === "created" ? "active" : ""}" data-sort="created">按发帖时间</span>
+                <span class="sort-tab ${sort === "reply" ? "active" : ""}" data-sort="reply">按回复时间</span>
+              </div>
             </div>
-            <button id="syncBtn" class="btn btn-sm">同步数据</button>
+            <div class="toolbar-right">
+              <button id="syncBtn" class="btn btn-sm">同步数据</button>
+              <button class="theme-toggle" id="themeToggle" title="切换主题">
+                <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+                </svg>
+                <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+                </svg>
+              </button>
+            </div>
           </div>
 
           <div id="console-output"></div>
@@ -298,7 +355,29 @@ export async function renderHome(env, sort = "created") {
     <script>
       let currentThreadId = null;
 
+      // 主题初始化
+      (function initTheme() {
+        const saved = localStorage.getItem('theme');
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        if (saved === 'dark' || (!saved && prefersDark)) {
+          document.documentElement.setAttribute('data-theme', 'dark');
+        }
+      })();
+
       document.addEventListener('DOMContentLoaded', () => {
+        // 主题切换
+        document.getElementById('themeToggle').addEventListener('click', () => {
+          const html = document.documentElement;
+          const isDark = html.getAttribute('data-theme') === 'dark';
+          if (isDark) {
+            html.removeAttribute('data-theme');
+            localStorage.setItem('theme', 'light');
+          } else {
+            html.setAttribute('data-theme', 'dark');
+            localStorage.setItem('theme', 'dark');
+          }
+        });
+
         // 帖子点击事件
         document.getElementById('threadList').addEventListener('click', (e) => {
           const card = e.target.closest('.thread-card');
@@ -529,21 +608,97 @@ export async function getThreadData(env, threadId) {
       created_at_fmt: formatTime(thread.created_at),
       last_synced_fmt: formatTime(thread.last_synced)
     },
-    comments: comments.map(c => ({
-      ...c,
-      post_date_fmt: formatTime(c.post_date),
-      content_html: (c.content || "")
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/\n/g, '<br>')
-        .replace(/\[quote\]/g, '<blockquote>')
-        .replace(/\[\/quote\]/g, '</blockquote>')
-    }))
+    comments: comments.map(c => {
+      // 解析 raw_json 获取附件信息
+      let attachments = [];
+      try {
+        const rawData = JSON.parse(c.raw_json || '{}');
+        attachments = rawData.attachments || [];
+      } catch (e) {}
+
+      // 构建附件ID映射
+      const attachMap = {};
+      for (const att of attachments) {
+        attachMap[att.attachment_id] = att;
+      }
+
+      // 渲染内容
+      const content_html = renderContent(c.content || "", attachMap);
+
+      return {
+        ...c,
+        post_date_fmt: formatTime(c.post_date),
+        content_html
+      };
+    })
   };
 
   return new Response(JSON.stringify(result), {
     headers: { "content-type": "application/json;charset=utf-8" }
   });
+}
+
+// 渲染帖子内容，处理各种标签
+function renderContent(content, attachMap) {
+  const BBS_BASE = 'https://bbs.uestc.edu.cn';
+
+  let html = content
+    // 转义 HTML
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+
+  // 处理 [attach]xxx[/attach] 标签
+  html = html.replace(/\[attach\](\d+)\[\/attach\]/g, (match, attachId) => {
+    const att = attachMap[attachId];
+    if (att && att.is_image) {
+      const thumbUrl = att.thumbnail_url ? BBS_BASE + att.thumbnail_url : null;
+      const rawUrl = att.raw_url ? BBS_BASE + att.raw_url : null;
+      const imgSrc = thumbUrl || rawUrl;
+      if (imgSrc) {
+        return `<a href="${rawUrl || imgSrc}" target="_blank"><img src="${imgSrc}" alt="附件图片" loading="lazy"></a>`;
+      }
+    }
+    // 非图片附件或未找到
+    return `<span class="attachment-placeholder">[附件 ${attachId}]</span>`;
+  });
+
+  // 处理 Markdown 风格的图片引用 ![name](i:xxx)
+  html = html.replace(/!\[([^\]]*)\]\(i:(\d+)\)/g, (match, altText, attachId) => {
+    const att = attachMap[attachId];
+    if (att && att.is_image) {
+      const thumbUrl = att.thumbnail_url ? BBS_BASE + att.thumbnail_url : null;
+      const rawUrl = att.raw_url ? BBS_BASE + att.raw_url : null;
+      const imgSrc = thumbUrl || rawUrl;
+      if (imgSrc) {
+        return `<a href="${rawUrl || imgSrc}" target="_blank"><img src="${imgSrc}" alt="${altText || '图片'}" loading="lazy"></a>`;
+      }
+    }
+    return `<span class="attachment-placeholder">[图片 ${attachId}]</span>`;
+  });
+
+  // 处理表情 [a:xxx]
+  html = html.replace(/\[a:(\d+)\]/g, (match, emojiId) => {
+    return `<img src="${BBS_BASE}/static/image/smiley/alu/${emojiId}.gif" alt="表情" class="emoji">`;
+  });
+
+  // 处理表情 ![num](s)
+  html = html.replace(/!\[(\d+)\]\(s\)/g, (match, emojiId) => {
+    return `<img src="${BBS_BASE}/static/image/smiley/default/${emojiId}.gif" alt="表情" class="emoji">`;
+  });
+
+  // 处理 [quote] 标签
+  html = html.replace(/\[quote\]/g, '<blockquote>').replace(/\[\/quote\]/g, '</blockquote>');
+
+  // 处理换行
+  html = html.replace(/\n/g, '<br>');
+
+  // 处理链接 [链接文字](url)
+  html = html.replace(/\[([^\]]+)\]\((https?:\/\/[^\)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+
+  // 处理普通 URL（未被处理过的）
+  html = html.replace(/(^|[^"'>])(https?:\/\/[^\s<]+)/g, '$1<a href="$2" target="_blank" rel="noopener">$2</a>');
+
+  return html;
 }
 
 // 保留独立页面 (用于直接访问 /thread/:id)
