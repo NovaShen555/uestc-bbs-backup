@@ -223,9 +223,12 @@ export async function renderHome(env, sort = "created") {
         padding: 20px; text-align: center; color: #cf1322;
       }
 
-      /* 返回按钮 (移动端) */
+      /* 返回/关闭按钮 */
       .back-btn {
-        display: none; margin-bottom: 15px;
+        margin-bottom: 15px;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
       }
 
       /* 响应式 */
