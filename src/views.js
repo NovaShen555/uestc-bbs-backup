@@ -12,7 +12,7 @@ export async function renderHome(env, sort = "created") {
     "SELECT MAX(last_synced) as last_time FROM threads"
   ).first();
   const lastSyncTime = lastSync?.last_time
-    ? new Date(lastSync.last_time * 1000).toLocaleString('zh-CN')
+    ? new Date(lastSync.last_time * 1000).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })
     : '从未同步';
 
   const html = `
@@ -125,8 +125,8 @@ export async function renderHome(env, sort = "created") {
 
       <div class="thread-list">
         ${results.map(t => {
-          const createdTime = new Date(t.created_at * 1000).toLocaleString('zh-CN');
-          const lastReplyTime = t.last_synced ? new Date(t.last_synced * 1000).toLocaleString('zh-CN') : null;
+          const createdTime = new Date(t.created_at * 1000).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' });
+          const lastReplyTime = t.last_synced ? new Date(t.last_synced * 1000).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' }) : null;
           return `
           <div class="thread-card">
             <div class="thread-info">
@@ -346,8 +346,8 @@ export async function renderThread(env, threadId) {
           <span>ID: ${thread.thread_id}</span>
           <span>楼主: <strong>${thread.author}</strong></span>
           <span>回复数: ${thread.replies}</span>
-          <span>发布于: ${new Date(thread.created_at * 1000).toLocaleString('zh-CN')}</span>
-          ${thread.last_synced ? `<span>最后同步: ${new Date(thread.last_synced * 1000).toLocaleString('zh-CN')}</span>` : ''}
+          <span>发布于: ${new Date(thread.created_at * 1000).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}</span>
+          ${thread.last_synced ? `<span>最后同步: ${new Date(thread.last_synced * 1000).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}</span>` : ''}
         </div>
       </div>
 
@@ -360,7 +360,7 @@ export async function renderThread(env, threadId) {
                 <strong style="font-size: 1rem;">${c.author}</strong>
               </div>
               <div class="post-time">
-                ${new Date(c.post_date * 1000).toLocaleString('zh-CN')}
+                ${new Date(c.post_date * 1000).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}
                 <span style="margin-left: 8px; color: #bbb; font-size: 0.8rem;">#${c.post_id}</span>
               </div>
             </div>
