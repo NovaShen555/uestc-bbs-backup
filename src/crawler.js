@@ -94,10 +94,10 @@ async function syncNewReplies(env, log) {
 
   let page = 1;
   let totalUpdated = 0;
-  let hasMoreReplies = false;
+  let foundEmptyPage = false;  // 是否找到一整页都不需要更新
 
-  // 限制最多翻 2 页，每页处理有限数量
-  while (page <= 2 && totalUpdated < 10) {
+  // 翻页检查，直到找到一整页都不需要更新
+  while (page <= 3) {
     const url = `https://bbs.uestc.edu.cn/_/forum/toplist?idlist=newreply&page=${page}`;
     await log(`正在请求 newreply 第${page}页...`);
 
@@ -109,47 +109,48 @@ async function syncNewReplies(env, log) {
 
     const data = await resp.json();
     const threads = data.data.newreply || [];
-    if (threads.length === 0) break;
+    if (threads.length === 0) {
+      foundEmptyPage = true;
+      break;
+    }
 
-    let needUpdate = 0;
-    let skippedDueToLimit = 0;
+    let pageNeedUpdate = 0;  // 这一页需要更新的数量
 
     for (const t of threads) {
       const dbThread = await env.DB.prepare("SELECT replies FROM threads WHERE thread_id = ?").bind(t.thread_id).first();
       const dbReplies = dbThread?.replies ?? -1;
 
       if (t.replies > dbReplies) {
-        if (totalUpdated >= 10) {
-          // 还有更多需要更新的，但达到了本次限制
-          skippedDueToLimit++;
+        pageNeedUpdate++;
+
+        // 达到本次更新限制，跳过执行但继续计数
+        if (totalUpdated >= 8) {
           continue;
         }
 
         if (dbReplies < 0) {
-          // 帖子不存在，完整抓取
           await processThread(env, t.thread_id, log);
         } else {
           await updateThreadComments(env, t.thread_id, t.replies, dbReplies, log);
         }
-        needUpdate++;
         totalUpdated++;
       }
     }
 
-    // 如果因为限制跳过了一些，说明还有更多
-    if (skippedDueToLimit > 0) {
-      hasMoreReplies = true;
-    }
-
-    if (needUpdate === 0 && skippedDueToLimit === 0) {
-      await log("整页无需更新，停止翻页");
+    // 整页无需更新 → 同步完成
+    if (pageNeedUpdate === 0) {
+      await log("整页无需更新，同步完成");
+      foundEmptyPage = true;
       break;
     }
+
     page++;
   }
 
   await log(`回复同步完成，共更新 ${totalUpdated} 个帖子`);
-  return { hasMoreReplies, updatedCount: totalUpdated };
+
+  // 没找到空页 = 还有更多需要同步
+  return { hasMoreReplies: !foundEmptyPage, updatedCount: totalUpdated };
 }
 
 /**

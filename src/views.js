@@ -7,6 +7,14 @@ export async function renderHome(env, sort = "created") {
     `SELECT * FROM threads ORDER BY ${orderBy} LIMIT 50`
   ).all();
 
+  // 获取最后同步时间
+  const lastSync = await env.DB.prepare(
+    "SELECT MAX(last_synced) as last_time FROM threads"
+  ).first();
+  const lastSyncTime = lastSync?.last_time
+    ? new Date(lastSync.last_time * 1000).toLocaleString('zh-CN')
+    : '从未同步';
+
   const html = `
   <!DOCTYPE html>
   <html lang="zh-CN">
@@ -37,6 +45,7 @@ export async function renderHome(env, sort = "created") {
         box-shadow: 0 4px 12px rgba(0,0,0,0.05); border-bottom: 3px solid var(--primary-color);
       }
       .page-header h1 { margin: 0; font-size: 1.8rem; color: #111; }
+      .page-header .sync-time { font-size: 0.85rem; color: var(--meta-color); margin-top: 8px; }
 
       .toolbar {
         background: #fff; padding: 15px 20px; border-radius: 10px; margin-bottom: 20px;
@@ -80,10 +89,14 @@ export async function renderHome(env, sort = "created") {
       .thread-info { flex: 1; min-width: 0; }
       .thread-title {
         font-size: 1.05rem; font-weight: 500; margin-bottom: 6px;
+        display: flex; align-items: center; gap: 8px;
+      }
+      .thread-title a {
+        text-decoration: none; color: var(--text-color);
         overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
       }
-      .thread-title a { text-decoration: none; color: var(--text-color); }
       .thread-title a:hover { color: var(--primary-color); }
+      .thread-id { font-size: 0.75rem; color: var(--meta-color); font-weight: normal; flex-shrink: 0; }
 
       .thread-meta { font-size: 0.85rem; color: var(--meta-color); display: flex; gap: 12px; flex-wrap: wrap; }
       .thread-stats {
@@ -97,6 +110,7 @@ export async function renderHome(env, sort = "created") {
     <div class="container">
       <div class="page-header">
         <h1>河畔监控台</h1>
+        <div class="sync-time">最后同步: ${lastSyncTime}</div>
       </div>
 
       <div class="toolbar">
@@ -110,13 +124,20 @@ export async function renderHome(env, sort = "created") {
       <div id="console-output"></div>
 
       <div class="thread-list">
-        ${results.map(t => `
+        ${results.map(t => {
+          const createdTime = new Date(t.created_at * 1000).toLocaleString('zh-CN');
+          const lastReplyTime = t.last_synced ? new Date(t.last_synced * 1000).toLocaleString('zh-CN') : null;
+          return `
           <div class="thread-card">
             <div class="thread-info">
-              <div class="thread-title"><a href="/thread/${t.thread_id}">${t.subject}</a></div>
+              <div class="thread-title">
+                <a href="/thread/${t.thread_id}">${t.subject}</a>
+                <span class="thread-id">#${t.thread_id}</span>
+              </div>
               <div class="thread-meta">
                 <span>作者: ${t.author}</span>
-                <span>发布于: ${new Date(t.created_at * 1000).toLocaleString('zh-CN')}</span>
+                <span>发布于: ${createdTime}</span>
+                ${lastReplyTime ? `<span>最新回复: ${lastReplyTime}</span>` : ''}
               </div>
             </div>
             <div class="thread-stats">
@@ -124,7 +145,7 @@ export async function renderHome(env, sort = "created") {
               <span>${t.views || 0} 浏览</span>
             </div>
           </div>
-        `).join('')}
+        `}).join('')}
       </div>
     </div>
 
@@ -326,6 +347,7 @@ export async function renderThread(env, threadId) {
           <span>楼主: <strong>${thread.author}</strong></span>
           <span>回复数: ${thread.replies}</span>
           <span>发布于: ${new Date(thread.created_at * 1000).toLocaleString('zh-CN')}</span>
+          ${thread.last_synced ? `<span>最后同步: ${new Date(thread.last_synced * 1000).toLocaleString('zh-CN')}</span>` : ''}
         </div>
       </div>
 
@@ -339,6 +361,7 @@ export async function renderThread(env, threadId) {
               </div>
               <div class="post-time">
                 ${new Date(c.post_date * 1000).toLocaleString('zh-CN')}
+                <span style="margin-left: 8px; color: #bbb; font-size: 0.8rem;">#${c.post_id}</span>
               </div>
             </div>
             <div class="post-content">
