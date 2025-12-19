@@ -1,5 +1,5 @@
 import { handleSchedule } from './crawler.js';
-import { renderHome, renderThread } from './views.js';
+import { renderHome, renderThread, getThreadData } from './views.js';
 
 export default {
   // 定时任务入口
@@ -21,6 +21,12 @@ export default {
     if (url.pathname.startsWith("/thread/")) {
       const threadId = url.pathname.split("/")[2];
       return await renderThread(env, threadId);
+    }
+
+    // 路由: API 获取帖子数据 (JSON)
+    if (url.pathname.startsWith("/api/thread/")) {
+      const threadId = url.pathname.split("/")[3];
+      return await getThreadData(env, threadId);
     }
 
     // 路由: 手动触发同步 (流式输出日志)
