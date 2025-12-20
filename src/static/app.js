@@ -2,6 +2,8 @@ let currentThreadId = null;
 let currentSort = 'created';
 let loadedThreads = 30;
 let isLoading = false;
+let searchTimeout = null;
+let isSearchMode = false;
 
 // 生成头像URL
 function getAvatarUrl(authorId) {
@@ -56,6 +58,35 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // 同步按钮
   document.getElementById('syncBtn').addEventListener('click', () => startSync());
+
+  // 搜索功能
+  const searchInput = document.getElementById('searchInput');
+  const searchDropdown = document.getElementById('searchDropdown');
+
+  searchInput.addEventListener('input', (e) => {
+    const query = e.target.value.trim();
+    if (query) {
+      clearTimeout(searchTimeout);
+      searchTimeout = setTimeout(() => fetchSearchSummary(query), 300);
+    } else {
+      searchDropdown.classList.remove('show');
+    }
+  });
+
+  searchInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      const query = e.target.value.trim();
+      if (query) {
+        performFullSearch(query);
+      }
+    }
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!searchInput.contains(e.target) && !searchDropdown.contains(e.target)) {
+      searchDropdown.classList.remove('show');
+    }
+  });
 
   // 无限滚动
   const sidebar = document.querySelector('.sidebar');
@@ -311,4 +342,138 @@ async function loadMoreThreads() {
 function formatTime(timestamp) {
   if (!timestamp) return '';
   return new Date(timestamp * 1000).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' });
+}
+
+async function fetchSearchSummary(query) {
+  const dropdown = document.getElementById('searchDropdown');
+  try {
+    const resp = await fetch(`https://bbs.uestc.edu.cn/_/search/summary?q=${encodeURIComponent(query)}`);
+    const data = await resp.json();
+
+    if (data.code === 0 && data.data) {
+      renderSearchDropdown(data.data, query);
+    }
+  } catch (e) {
+    console.error('搜索失败:', e);
+  }
+}
+
+function renderSearchDropdown(data, query) {
+  const dropdown = document.getElementById('searchDropdown');
+  let html = '';
+
+  if (data.tid_match) {
+    html += `<div class="search-section">
+      <div class="search-section-title">精确匹配 (帖子ID)</div>
+      <div class="search-item" onclick="loadThread(${data.tid_match.thread_id})">
+        <div class="search-item-title">${data.tid_match.subject}</div>
+        <div class="search-item-meta">作者: ${data.tid_match.author} · ID: ${data.tid_match.thread_id}</div>
+      </div>
+    </div>`;
+  }
+
+  if (data.uid_match) {
+    html += `<div class="search-section">
+      <div class="search-section-title">精确匹配 (用户ID)</div>
+      <div class="search-item">
+        <div class="search-item-title">${data.uid_match.username}</div>
+        <div class="search-item-meta">UID: ${data.uid_match.uid} · ${data.uid_match.group_title}</div>
+      </div>
+    </div>`;
+  }
+
+  if (data.threads && data.threads.length > 0) {
+    html += `<div class="search-section">
+      <div class="search-section-title">帖子 (${data.thread_count})</div>`;
+    data.threads.slice(0, 5).forEach(t => {
+      html += `<div class="search-item" onclick="loadThread(${t.thread_id})">
+        <div class="search-item-title">${t.subject}</div>
+        <div class="search-item-meta">作者: ${t.author} · ${formatTime(t.dateline)}</div>
+      </div>`;
+    });
+    if (data.thread_count > 5) {
+      html += `<div class="search-item" onclick="performFullSearch('${query}')" style="text-align: center; color: var(--primary-color); font-weight: 500;">
+        查看全部 ${data.thread_count} 个结果
+      </div>`;
+    }
+    html += `</div>`;
+  }
+
+  if (data.users && data.users.length > 0) {
+    html += `<div class="search-section">
+      <div class="search-section-title">用户 (${data.user_count})</div>`;
+    data.users.slice(0, 5).forEach(u => {
+      html += `<div class="search-item">
+        <div class="search-item-title">${u.username}</div>
+        <div class="search-item-meta">UID: ${u.uid} · ${u.group_title}</div>
+      </div>`;
+    });
+    html += `</div>`;
+  }
+
+  if (!html) {
+    html = '<div class="search-empty">未找到相关结果</div>';
+  }
+
+  dropdown.innerHTML = html;
+  dropdown.classList.add('show');
+}
+
+async function performFullSearch(query) {
+  const dropdown = document.getElementById('searchDropdown');
+  dropdown.classList.remove('show');
+
+  isSearchMode = true;
+  const threadList = document.getElementById('threadList');
+  threadList.innerHTML = '<div class="loading-spinner"><div class="spinner"></div></div>';
+
+  try {
+    const resp = await fetch(`https://bbs.uestc.edu.cn/_/search/threads?q=${encodeURIComponent(query)}&page=1`);
+    const data = await resp.json();
+
+    if (data.code === 0 && data.data && data.data.rows) {
+      renderSearchResults(data.data.rows, query, data.data.total);
+    } else {
+      threadList.innerHTML = '<div class="search-empty">未找到相关结果</div>';
+    }
+  } catch (e) {
+    console.error('搜索失败:', e);
+    threadList.innerHTML = '<div class="error-message">搜索失败</div>';
+  }
+}
+
+function renderSearchResults(threads, query, total) {
+  const threadList = document.getElementById('threadList');
+
+  let html = `<div style="padding: 12px; background: var(--card-bg); border-radius: 8px; margin-bottom: 12px; border: 1px solid var(--border-color);">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+      <div style="font-size: 0.9rem; color: var(--text-color);">搜索 "<strong>${query}</strong>" 找到 ${total} 个结果</div>
+      <button class="btn btn-sm" onclick="exitSearchMode()">返回列表</button>
+    </div>
+  </div>`;
+
+  threads.forEach(t => {
+    html += `<div class="thread-card" data-id="${t.thread_id}">
+      <div class="thread-title">
+        <span class="thread-title-text">${t.subject}</span>
+        <span class="thread-id">#${t.thread_id}</span>
+      </div>
+      <div class="thread-meta">
+        <span>${t.author}</span>
+        <span>${formatTime(t.dateline)}</span>
+      </div>
+      <div class="thread-stats">
+        <span class="reply-count">${t.replies} 回复</span>
+        <span> · ${t.views || 0} 浏览</span>
+      </div>
+    </div>`;
+  });
+
+  threadList.innerHTML = html;
+}
+
+function exitSearchMode() {
+  isSearchMode = false;
+  document.getElementById('searchInput').value = '';
+  window.location.reload();
 }
