@@ -631,6 +631,7 @@ export async function getThreadData(env, threadId) {
     }
   } else {
     console.log(`[LazyLoad] 本地未找到帖子 ${threadId}，正在尝试回源抓取...`);
+    let fetchError = null;
     try {
       await processThread(env, threadId, console.log);
       const newData = await queryDB();
@@ -638,14 +639,18 @@ export async function getThreadData(env, threadId) {
       comments = newData.comments;
     } catch (e) {
       console.error(`[LazyLoad] 抓取失败: ${e.message}`);
+      fetchError = e.message;
     }
-  }
 
-  if (!thread) {
-    return new Response(JSON.stringify({ error: `未找到 ID 为 ${threadId} 的帖子` }), {
-      status: 404,
-      headers: { "content-type": "application/json;charset=utf-8" }
-    });
+    if (!thread) {
+      const errorMsg = fetchError
+        ? `无法获取帖子 ${threadId}：${fetchError}`
+        : `未找到 ID 为 ${threadId} 的帖子（可能已被删除或权限不足）`;
+      return new Response(JSON.stringify({ error: errorMsg }), {
+        status: 404,
+        headers: { "content-type": "application/json;charset=utf-8" }
+      });
+    }
   }
 
   // 格式化数据
