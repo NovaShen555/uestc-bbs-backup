@@ -58,7 +58,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('syncBtn').addEventListener('click', () => startSync());
 
   // 无限滚动
-  const sidebar = document.querySelector('.sidebar-inner');
+  const sidebar = document.querySelector('.sidebar');
   sidebar.addEventListener('scroll', () => {
     if (isLoading) return;
     const { scrollTop, scrollHeight, clientHeight } = sidebar;
