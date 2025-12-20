@@ -200,32 +200,32 @@ function renderContent(content, attachMap) {
   html = html.replace(/\[a:(\d+)\]/g, (match, emojiId) => {
     const emoji = EMOJI_MAP[emojiId];
     if (emoji) {
-      return `<img src="${BBS_BASE}/static/image/smiley/${emoji.path}/${emoji.filename}" alt="表情" class="emoji">`;
+      return `<img src="${BBS_BASE}/static/image/smiley/${emoji.path}/${emoji.filename}" alt="[a:${emojiId}]" class="emoji">`;
     }
     // 回退：假设是 alu 包，文件名可能是 ID.gif
-    return `<img src="${BBS_BASE}/static/image/smiley/alu/${emojiId}.gif" alt="表情" class="emoji">`;
+    return `<img src="${BBS_BASE}/static/image/smiley/alu/${emojiId}.gif" alt="[a:${emojiId}]" class="emoji">`;
   });
 
   // 处理表情 [s:num] - 默认表情
   html = html.replace(/\[s:(\d+)\]/g, (match, emojiId) => {
     const emoji = EMOJI_MAP[emojiId];
     if (emoji) {
-      return `<img src="${BBS_BASE}/static/image/smiley/${emoji.path}/${emoji.filename}" alt="表情" class="emoji">`;
+      return `<img src="${BBS_BASE}/static/image/smiley/${emoji.path}/${emoji.filename}" alt="[s:${emojiId}]" class="emoji">`;
     }
-    return `<img src="${BBS_BASE}/static/image/smiley/default/${emojiId}.gif" alt="表情" class="emoji">`;
+    return `<img src="${BBS_BASE}/static/image/smiley/default/${emojiId}.gif" alt="[s:${emojiId}]" class="emoji">`;
   });
 
   // 处理表情 ![num](letter) - 如 ![74](s)
   html = html.replace(/!\[(\d+)\]\(([a-z])\)/g, (match, emojiId, prefix) => {
     const emoji = EMOJI_MAP[emojiId];
     if (emoji) {
-      return `<img src="${BBS_BASE}/static/image/smiley/${emoji.path}/${emoji.filename}" alt="表情" class="emoji">`;
+      return `<img src="${BBS_BASE}/static/image/smiley/${emoji.path}/${emoji.filename}" alt="![${emojiId}](${prefix})" class="emoji">`;
     }
     // 根据前缀回退
     if (prefix === 'a') {
-      return `<img src="${BBS_BASE}/static/image/smiley/alu/${emojiId}.gif" alt="表情" class="emoji">`;
+      return `<img src="${BBS_BASE}/static/image/smiley/alu/${emojiId}.gif" alt="![${emojiId}](${prefix})" class="emoji">`;
     }
-    return `<img src="${BBS_BASE}/static/image/smiley/default/${emojiId}.gif" alt="表情" class="emoji">`;
+    return `<img src="${BBS_BASE}/static/image/smiley/default/${emojiId}.gif" alt="![${emojiId}](${prefix})" class="emoji">`;
   });
 
   // 处理 [quote] 标签
