@@ -23,6 +23,13 @@ CREATE TABLE comments (
     raw_json TEXT                  -- 备份该楼层的完整 JSON
 );
 
+-- 3. 不存在的帖子表：记录已确认不存在的帖子ID，避免重复检查
+DROP TABLE IF EXISTS missing_threads;
+CREATE TABLE missing_threads (
+    thread_id INTEGER PRIMARY KEY,
+    checked_at INTEGER
+);
+
 -- 创建索引以加快查询速度
 CREATE INDEX IF NOT EXISTS idx_comments_thread_id ON comments(thread_id);
 CREATE INDEX IF NOT EXISTS idx_comments_position ON comments(position);

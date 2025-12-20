@@ -27,6 +27,7 @@ export async function handleSchedule(env, log = console.log) {
   let allThreads = [];
   let foundExisting = false;
   let hasMoreNewThreads = false;
+  let apiLatestId = 0;
 
   // 翻页获取，直到找到已有帖子（限制最多3页，避免请求过多）
   while (!foundExisting && page <= 3) {
@@ -45,6 +46,10 @@ export async function handleSchedule(env, log = console.log) {
     if (threads.length === 0) {
       await log("没有更多帖子了");
       break;
+    }
+
+    if (page === 1 && threads.length > 0) {
+      apiLatestId = threads[0].thread_id;
     }
 
     for (const t of threads) {
@@ -80,6 +85,11 @@ export async function handleSchedule(env, log = console.log) {
     await log("新帖同步完成。");
   }
 
+  // 回填检查：从最新ID往回检查100个，确保没有遗漏
+  if (apiLatestId > 0) {
+    await backfillCheck(env, apiLatestId, log);
+  }
+
   // 同步新回复
   const { hasMoreReplies, updatedCount } = await syncNewReplies(env, log);
 
@@ -87,6 +97,27 @@ export async function handleSchedule(env, log = console.log) {
   await log("所有同步任务结束。");
 
   return { hasMore, processedNewThreads, updatedReplies: updatedCount };
+}
+
+async function backfillCheck(env, apiLatestId, log) {
+  await log("开始回填检查...");
+  const checkStart = Math.max(1, apiLatestId - 100);
+
+  for (let id = apiLatestId; id >= checkStart; id--) {
+    const exists = await env.DB.prepare("SELECT 1 FROM threads WHERE thread_id = ?").bind(id).first();
+    if (exists) continue;
+
+    const missing = await env.DB.prepare("SELECT 1 FROM missing_threads WHERE thread_id = ?").bind(id).first();
+    if (missing) continue;
+
+    try {
+      await processThread(env, id, log);
+    } catch (e) {
+      await log(`回填检查 ${id} 失败: ${e.message}`);
+    }
+  }
+
+  await log("回填检查完成。");
 }
 
 async function syncNewReplies(env, log) {
@@ -242,7 +273,8 @@ export async function processThread(env, threadId, log) {
 
   if (!resp.ok) {
     if (resp.status === 404 || resp.status === 403) {
-      await log(`[${threadId}] 无法访问 (Status: ${resp.status})，跳过。`);
+      await log(`[${threadId}] 无法访问 (Status: ${resp.status})，记录为不存在。`);
+      await env.DB.prepare("INSERT OR IGNORE INTO missing_threads (thread_id, checked_at) VALUES (?, ?)").bind(threadId, Math.floor(Date.now() / 1000)).run();
       return;
     }
     throw new Error(`API 请求失败: ${resp.status}`);
