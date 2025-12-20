@@ -241,6 +241,7 @@ export async function renderHome(env, sort = "created") {
       .post-card {
         background: var(--card-bg); border-radius: 10px; padding: 16px; margin-bottom: 12px;
         box-shadow: 0 2px 8px rgba(0,0,0,0.03); border: 1px solid var(--border-color);
+        transition: background-color 0.3s ease;
       }
       .post-card.is-landlord { border-left: 3px solid var(--primary-color); }
 
@@ -480,7 +481,7 @@ export async function renderHome(env, sort = "created") {
 
           <div class="post-list">
             \${comments.map(c => \`
-              <div class="post-card \${c.position === 1 ? 'is-landlord' : ''}">
+              <div class="post-card \${c.position === 1 ? 'is-landlord' : ''}" data-post-id="\${c.post_id}">
                 <div class="post-meta">
                   <div class="author-info">
                     <span class="floor-tag">\${c.position === 1 ? '楼主' : '#' + c.position}</span>
@@ -546,6 +547,17 @@ export async function renderHome(env, sort = "created") {
         document.querySelectorAll('.thread-card').forEach(c => c.classList.remove('active'));
         history.replaceState(null, '', window.location.pathname + window.location.search);
         currentThreadId = null;
+      }
+
+      function jumpToPost(postId) {
+        const postCard = document.querySelector(\`.post-card[data-post-id="\${postId}"]\`);
+        if (postCard) {
+          postCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          postCard.style.backgroundColor = 'var(--active-bg)';
+          setTimeout(() => {
+            postCard.style.backgroundColor = '';
+          }, 2000);
+        }
       }
 
       async function startSync(round = 1) {
@@ -772,11 +784,25 @@ function renderContent(content, attachMap) {
   // 处理 [quote] 标签
   html = html.replace(/\[quote\]/g, '<blockquote>').replace(/\[\/quote\]/g, '</blockquote>');
 
+  // 处理 [size=...] 标签（忽略）
+  html = html.replace(/\[size=\d+\]/g, '').replace(/\[\/size\]/g, '');
+
+  // 处理 [color=...] 标签
+  html = html.replace(/\[color=([^\]]+)\]([^\[]*)\[\/color\]/g, '<span style="color:$1">$2</span>');
+
   // 处理换行
   html = html.replace(/\n/g, '<br>');
 
   // 处理 BBCode 链接 [url=...]...[/url]
   html = html.replace(/\[url=([^\]]+)\]([^\[]*)\[\/url\]/g, (match, url, text) => {
+    // 检查是否是内部跳转链接（跳到某个回复）
+    const postMatch = url.match(/goto=findpost.*?pid=(\d+)/i);
+    if (postMatch) {
+      const postId = postMatch[1];
+      return `<a href="#" class="jump-to-post" data-post-id="${postId}" onclick="jumpToPost('${postId}'); return false;">${text || url}</a>`;
+    }
+
+    // 检查是否是内部 BBS 链接
     const threadMatch = url.match(/thread[_-]?id[=:](\d+)|tid=(\d+)/i);
     const threadId = threadMatch ? (threadMatch[1] || threadMatch[2]) : null;
     if (threadId) {
