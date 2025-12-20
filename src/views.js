@@ -500,6 +500,41 @@ export async function renderHome(env, sort = "created") {
         contentInner.innerHTML = html;
         contentInner.scrollTop = 0;
         document.getElementById('mainContent').scrollTop = 0;
+
+        // 动态获取链接标题
+        fetchLinkTitles();
+      }
+
+      async function fetchLinkTitles() {
+        const links = document.querySelectorAll('.dynamic-link');
+        for (const link of links) {
+          const threadId = link.dataset.threadId;
+          const url = link.dataset.url;
+
+          if (threadId) {
+            // 内部 BBS 链接，从数据库获取
+            try {
+              const resp = await fetch(\`/api/thread/\${threadId}\`);
+              if (resp.ok) {
+                const data = await resp.json();
+                if (data.thread && data.thread.subject) {
+                  link.textContent = data.thread.subject;
+                }
+              }
+            } catch (e) {}
+          } else if (url) {
+            // 外部链接，通过 API 获取标题
+            try {
+              const resp = await fetch(\`/api/fetch-title?url=\${encodeURIComponent(url)}\`);
+              if (resp.ok) {
+                const data = await resp.json();
+                if (data.title) {
+                  link.textContent = data.title;
+                }
+              }
+            } catch (e) {}
+          }
+        }
       }
 
       function closeThread() {
@@ -734,6 +769,16 @@ function renderContent(content, attachMap) {
 
   // 处理换行
   html = html.replace(/\n/g, '<br>');
+
+  // 处理 BBCode 链接 [url=...]...[/url]
+  html = html.replace(/\[url=([^\]]+)\]([^\[]*)\[\/url\]/g, (match, url, text) => {
+    const threadMatch = url.match(/thread[_-]?id[=:](\d+)|tid=(\d+)/i);
+    const threadId = threadMatch ? (threadMatch[1] || threadMatch[2]) : null;
+    if (threadId) {
+      return `<a href="${url}" target="_blank" rel="noopener" class="dynamic-link" data-thread-id="${threadId}" data-url="${url}">${text || url}</a>`;
+    }
+    return `<a href="${url}" target="_blank" rel="noopener" class="dynamic-link" data-url="${url}">${text || url}</a>`;
+  });
 
   // 处理链接 [链接文字](url)
   html = html.replace(/\[([^\]]+)\]\((https?:\/\/[^\)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');

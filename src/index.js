@@ -29,6 +29,44 @@ export default {
       return await getThreadData(env, threadId);
     }
 
+    // 路由: API 获取外部链接标题
+    if (url.pathname === "/api/fetch-title") {
+      const targetUrl = url.searchParams.get("url");
+      if (!targetUrl) {
+        return new Response(JSON.stringify({ error: "Missing url parameter" }), {
+          status: 400,
+          headers: { "content-type": "application/json;charset=utf-8" }
+        });
+      }
+
+      try {
+        const resp = await fetch(targetUrl, {
+          headers: { "User-Agent": "Mozilla/5.0" },
+          cf: { cacheTtl: 3600 }
+        });
+
+        if (!resp.ok) {
+          return new Response(JSON.stringify({ error: "Failed to fetch" }), {
+            status: resp.status,
+            headers: { "content-type": "application/json;charset=utf-8" }
+          });
+        }
+
+        const html = await resp.text();
+        const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
+        const title = titleMatch ? titleMatch[1].trim() : null;
+
+        return new Response(JSON.stringify({ title }), {
+          headers: { "content-type": "application/json;charset=utf-8" }
+        });
+      } catch (e) {
+        return new Response(JSON.stringify({ error: e.message }), {
+          status: 500,
+          headers: { "content-type": "application/json;charset=utf-8" }
+        });
+      }
+    }
+
     // 路由: 手动触发同步 (流式输出日志)
     if (url.pathname === "/sync") {
       const { readable, writable } = new TransformStream();
