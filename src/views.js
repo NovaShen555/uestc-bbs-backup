@@ -215,6 +215,19 @@ function renderContent(content, attachMap) {
     return `<img src="${BBS_BASE}/static/image/smiley/default/${emojiId}.gif" alt="表情" class="emoji">`;
   });
 
+  // 处理表情 ![num](letter) - 如 ![74](s)
+  html = html.replace(/!\[(\d+)\]\(([a-z])\)/g, (match, emojiId, prefix) => {
+    const emoji = EMOJI_MAP[emojiId];
+    if (emoji) {
+      return `<img src="${BBS_BASE}/static/image/smiley/${emoji.path}/${emoji.filename}" alt="表情" class="emoji">`;
+    }
+    // 根据前缀回退
+    if (prefix === 'a') {
+      return `<img src="${BBS_BASE}/static/image/smiley/alu/${emojiId}.gif" alt="表情" class="emoji">`;
+    }
+    return `<img src="${BBS_BASE}/static/image/smiley/default/${emojiId}.gif" alt="表情" class="emoji">`;
+  });
+
   // 处理 [quote] 标签
   html = html.replace(/\[quote\]/g, '<blockquote>').replace(/\[\/quote\]/g, '</blockquote>');
 
