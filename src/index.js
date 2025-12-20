@@ -59,6 +59,67 @@ export default {
       });
     }
 
+    // 路由: API 搜索摘要
+    if (url.pathname === "/api/search/summary") {
+      const query = url.searchParams.get("q");
+      if (!query) {
+        return new Response(JSON.stringify({ error: "Missing query parameter" }), {
+          status: 400,
+          headers: { "content-type": "application/json;charset=utf-8" }
+        });
+      }
+
+      try {
+        const resp = await fetch(`https://bbs.uestc.edu.cn/_/search/summary?q=${encodeURIComponent(query)}`, {
+          headers: {
+            "authorization": env.BBS_AUTH,
+            "Cookie": env.BBS_COOKIE
+          }
+        });
+
+        const data = await resp.json();
+        return new Response(JSON.stringify(data), {
+          headers: { "content-type": "application/json;charset=utf-8" }
+        });
+      } catch (e) {
+        return new Response(JSON.stringify({ error: e.message }), {
+          status: 500,
+          headers: { "content-type": "application/json;charset=utf-8" }
+        });
+      }
+    }
+
+    // 路由: API 搜索帖子
+    if (url.pathname === "/api/search/threads") {
+      const query = url.searchParams.get("q");
+      const page = url.searchParams.get("page") || "1";
+      if (!query) {
+        return new Response(JSON.stringify({ error: "Missing query parameter" }), {
+          status: 400,
+          headers: { "content-type": "application/json;charset=utf-8" }
+        });
+      }
+
+      try {
+        const resp = await fetch(`https://bbs.uestc.edu.cn/_/search/threads?q=${encodeURIComponent(query)}&page=${page}`, {
+          headers: {
+            "authorization": env.BBS_AUTH,
+            "Cookie": env.BBS_COOKIE
+          }
+        });
+
+        const data = await resp.json();
+        return new Response(JSON.stringify(data), {
+          headers: { "content-type": "application/json;charset=utf-8" }
+        });
+      } catch (e) {
+        return new Response(JSON.stringify({ error: e.message }), {
+          status: 500,
+          headers: { "content-type": "application/json;charset=utf-8" }
+        });
+      }
+    }
+
     // 路由: API 获取外部链接标题
     if (url.pathname === "/api/fetch-title") {
       const targetUrl = url.searchParams.get("url");

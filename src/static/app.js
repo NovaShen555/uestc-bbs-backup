@@ -347,7 +347,7 @@ function formatTime(timestamp) {
 async function fetchSearchSummary(query) {
   const dropdown = document.getElementById('searchDropdown');
   try {
-    const resp = await fetch(`https://bbs.uestc.edu.cn/_/search/summary?q=${encodeURIComponent(query)}`);
+    const resp = await fetch(`/api/search/summary?q=${encodeURIComponent(query)}`);
     const data = await resp.json();
 
     if (data.code === 0 && data.data) {
@@ -428,7 +428,7 @@ async function performFullSearch(query) {
   threadList.innerHTML = '<div class="loading-spinner"><div class="spinner"></div></div>';
 
   try {
-    const resp = await fetch(`https://bbs.uestc.edu.cn/_/search/threads?q=${encodeURIComponent(query)}&page=1`);
+    const resp = await fetch(`/api/search/threads?q=${encodeURIComponent(query)}&page=1`);
     const data = await resp.json();
 
     if (data.code === 0 && data.data && data.data.rows) {
