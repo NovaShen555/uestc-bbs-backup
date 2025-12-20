@@ -267,6 +267,14 @@ body {
   font-size: 0.95rem; font-weight: 500; margin-bottom: 4px;
   display: flex; align-items: center; gap: 6px;
 }
+.thread-avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid var(--border-color);
+  flex-shrink: 0;
+}
 .thread-title-text {
   color: var(--text-color);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;

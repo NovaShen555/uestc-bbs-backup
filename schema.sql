@@ -4,6 +4,7 @@ CREATE TABLE threads (
     thread_id INTEGER PRIMARY KEY, -- 对应 JSON 中的 thread_id
     subject TEXT,                  -- 标题
     author TEXT,                   -- 楼主名字
+    author_id INTEGER,             -- 楼主ID
     views INTEGER,                 -- 浏览量
     replies INTEGER,               -- 回复量
     created_at INTEGER,            -- 发帖时间

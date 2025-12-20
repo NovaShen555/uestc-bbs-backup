@@ -21,9 +21,12 @@ export async function renderHome(env, sort = "created") {
   const lastSyncTime = formatTime(lastSync?.last_time) || '从未同步';
 
   // 生成帖子列表 HTML
-  const threadListHtml = results.map(t => `
+  const threadListHtml = results.map(t => {
+    const avatarUrl = t.author_id ? getAvatarUrl(t.author_id) : '';
+    return `
     <div class="thread-card" data-id="${t.thread_id}">
       <div class="thread-title">
+        ${avatarUrl ? `<img src="${avatarUrl}" alt="${t.author}" class="thread-avatar" onerror="this.style.display='none'">` : ''}
         <span class="thread-title-text">${t.subject}</span>
         <span class="thread-id">#${t.thread_id}</span>
       </div>
@@ -37,7 +40,16 @@ export async function renderHome(env, sort = "created") {
         ${t.last_synced ? `<span> · 最新: ${formatTime(t.last_synced)}</span>` : ''}
       </div>
     </div>
-  `).join('');
+  `;
+  }).join('');
+
+// 生成头像URL
+function getAvatarUrl(authorId) {
+  if (!authorId) return '';
+  const id = String(authorId).padStart(6, '0');
+  const path = `000/${id.slice(0, 2)}/${id.slice(2, 4)}/${id.slice(4, 6)}`;
+  return `https://bbs.uestc.edu.cn/uc_server/data/avatar/${path}_avatar_middle.jpg`;
+}
 
   // 替换模板变量
   const html = templateHtml

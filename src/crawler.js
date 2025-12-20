@@ -298,8 +298,8 @@ export async function processThread(env, threadId, log) {
   const stmts = [];
 
   stmts.push(env.DB.prepare(`
-    INSERT INTO threads (thread_id, subject, author, views, replies, created_at, last_synced)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO threads (thread_id, subject, author, author_id, views, replies, created_at, last_synced)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(thread_id) DO UPDATE SET
       views=excluded.views,
       replies=excluded.replies,
@@ -308,6 +308,7 @@ export async function processThread(env, threadId, log) {
     threadInfo.thread_id,
     threadInfo.subject ?? "无标题",
     threadInfo.author ?? "未知用户",
+    threadInfo.author_id ?? null,
     threadInfo.views ?? 0,
     threadInfo.replies ?? 0,
     threadInfo.dateline ?? 0,

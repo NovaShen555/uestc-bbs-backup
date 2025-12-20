@@ -152,6 +152,9 @@ function renderThread(data) {
   const { thread, comments } = data;
   const contentInner = document.getElementById('contentInner');
 
+  // 更新页面标题
+  document.title = thread.subject + ' - 河畔监控台';
+
   const html = `
     <button class="btn back-btn" onclick="closeThread()">← 返回列表</button>
 
@@ -235,6 +238,9 @@ function closeThread() {
   document.querySelectorAll('.thread-card').forEach(c => c.classList.remove('active'));
   history.replaceState(null, '', window.location.pathname + window.location.search);
   currentThreadId = null;
+
+  // 恢复原始标题
+  document.title = '河畔监控台';
 }
 
 function jumpToPost(postId) {
@@ -310,11 +316,13 @@ async function loadMoreThreads() {
     if (data.threads && data.threads.length > 0) {
       const threadList = document.getElementById('threadList');
       data.threads.forEach(t => {
+        const avatarUrl = t.author_id ? getAvatarUrl(t.author_id) : '';
         const card = document.createElement('div');
         card.className = 'thread-card';
         card.dataset.id = t.thread_id;
         card.innerHTML = `
           <div class="thread-title">
+            ${avatarUrl ? `<img src="${avatarUrl}" alt="${t.author}" class="thread-avatar" onerror="this.style.display='none'">` : ''}
             <span class="thread-title-text">${t.subject}</span>
             <span class="thread-id">#${t.thread_id}</span>
           </div>
@@ -453,8 +461,10 @@ function renderSearchResults(threads, query, total) {
   </div>`;
 
   threads.forEach(t => {
+    const avatarUrl = t.author_id ? getAvatarUrl(t.author_id) : '';
     html += `<div class="thread-card" data-id="${t.thread_id}">
       <div class="thread-title">
+        ${avatarUrl ? `<img src="${avatarUrl}" alt="${t.author}" class="thread-avatar" onerror="this.style.display='none'">` : ''}
         <span class="thread-title-text">${t.subject}</span>
         <span class="thread-id">#${t.thread_id}</span>
       </div>
