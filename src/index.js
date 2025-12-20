@@ -2,6 +2,7 @@ import { handleSchedule } from './crawler.js';
 import { renderHome, renderThread, getThreadData } from './views.js';
 import stylesCSS from './static/styles.css';
 import appJS from './static/app.js';
+import defaultAvatar from './static/default_avatar.png';
 
 export default {
   // 定时任务入口
@@ -19,6 +20,9 @@ export default {
     }
     if (url.pathname === "/static/app.js") {
       return new Response(appJS, { headers: { "content-type": "application/javascript;charset=utf-8" } });
+    }
+    if (url.pathname === "/static/default_avatar.png") {
+      return new Response(defaultAvatar, { headers: { "content-type": "image/png" } });
     }
 
     // 路由: 首页

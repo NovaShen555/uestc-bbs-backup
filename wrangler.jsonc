@@ -20,6 +20,11 @@
 			"type": "Text",
 			"globs": ["**/*.css", "**/*.html", "**/static/*.js"],
 			"fallthrough": true
+		},
+		{
+			"type": "Data",
+			"globs": ["**/*.png", "**/*.jpg", "**/*.jpeg", "**/*.gif"],
+			"fallthrough": true
 		}
 	],
 	"d1_databases": [

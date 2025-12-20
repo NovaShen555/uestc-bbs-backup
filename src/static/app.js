@@ -124,7 +124,7 @@ function renderThread(data) {
         <div class="post-card ${c.position === 1 ? 'is-landlord' : ''}" data-post-id="${c.post_id}">
           <div class="post-meta">
             <div class="author-info">
-              <img src="${getAvatarUrl(c.author_id)}" alt="${c.author}" class="avatar" onerror="this.style.display='none'">
+              <img src="${getAvatarUrl(c.author_id)}" alt="${c.author}" class="avatar" onerror="this.onerror=null; this.src='/static/default_avatar.png'">
               <span class="floor-tag">${c.position === 1 ? '楼主' : '#' + c.position}</span>
               <strong>${c.author}</strong>
             </div>
