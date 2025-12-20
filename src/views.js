@@ -720,8 +720,8 @@ function renderContent(content, attachMap) {
     return `<img src="${BBS_BASE}/static/image/smiley/alu/${emojiId}.gif" alt="表情" class="emoji">`;
   });
 
-  // 处理表情 ![num](s) - 默认表情
-  html = html.replace(/!\[(\d+)\]\(s\)/g, (match, emojiId) => {
+  // 处理表情 [s:num] - 默认表情
+  html = html.replace(/\[s:(\d+)\]/g, (match, emojiId) => {
     const emoji = EMOJI_MAP[emojiId];
     if (emoji) {
       return `<img src="${BBS_BASE}/static/image/smiley/${emoji.path}/${emoji.filename}" alt="表情" class="emoji">`;
