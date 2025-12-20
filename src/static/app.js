@@ -17,9 +17,13 @@ function getAvatarUrl(authorId) {
 (function initTheme() {
   const saved = localStorage.getItem('theme');
   const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+
   if (saved === 'dark' || (!saved && prefersDark)) {
     document.documentElement.setAttribute('data-theme', 'dark');
+  } else if (saved === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
   }
+  // 如果没有保存的设置，则跟随系统
 })();
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -29,9 +33,10 @@ document.addEventListener('DOMContentLoaded', () => {
   // 主题切换
   document.getElementById('themeToggle').addEventListener('click', () => {
     const html = document.documentElement;
-    const isDark = html.getAttribute('data-theme') === 'dark';
-    if (isDark) {
-      html.removeAttribute('data-theme');
+    const currentTheme = html.getAttribute('data-theme');
+
+    if (currentTheme === 'dark') {
+      html.setAttribute('data-theme', 'light');
       localStorage.setItem('theme', 'light');
     } else {
       html.setAttribute('data-theme', 'dark');
