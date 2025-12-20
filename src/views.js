@@ -237,6 +237,9 @@ function renderContent(content, attachMap) {
   // 处理 [quote] 标签
   html = html.replace(/\[quote\]/g, '<blockquote>').replace(/\[\/quote\]/g, '</blockquote>');
 
+  // 处理 [b] 标签
+  html = html.replace(/\[b\](.*?)\[\/b\]/g, '<strong>$1</strong>');
+
   // 处理 [size=...] 标签（忽略）
   html = html.replace(/\[size=\d+\]/g, '').replace(/\[\/size\]/g, '');
 

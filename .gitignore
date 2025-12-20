@@ -166,3 +166,4 @@ dist
 !.env.example
 .wrangler/
 .claude
+wrangler.jsonc
