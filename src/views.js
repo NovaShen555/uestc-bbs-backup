@@ -240,6 +240,9 @@ function renderContent(content, attachMap) {
   // 处理换行
   html = html.replace(/\n/g, '<br>');
 
+  // 处理 @用户 链接 [@用户名](at:用户ID)
+  html = html.replace(/\[@([^\]]+)\]\(at:(\d+)\)/g, '<a href="https://bbs.uestc.edu.cn/user/$2" target="_blank" rel="noopener" class="user-mention">@$1</a>');
+
   // 处理 BBCode 链接 [url=...]...[/url]
   html = html.replace(/\[url=([^\]]+)\]([^\[]*)\[\/url\]/g, (match, url, text) => {
     // 检查是否是内部跳转链接（跳到某个回复）

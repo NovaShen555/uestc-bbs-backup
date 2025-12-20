@@ -238,7 +238,17 @@ body {
 .post-content { font-size: 1rem; overflow-wrap: break-word; }
 .post-content img { max-width: 100%; height: auto; border-radius: 4px; margin: 8px 0; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
 .post-content img.emoji { display: inline; width: auto; height: 1.5em; margin: 0 2px; vertical-align: middle; box-shadow: none; border-radius: 0; }
-.post-content a { color: var(--primary-color); }
+.post-content a { color: var(--primary-color); text-decoration: none; }
+.post-content a:hover { text-decoration: underline; }
+.post-content .user-mention {
+  font-weight: 500;
+  padding: 2px 4px;
+  border-radius: 3px;
+  background: rgba(52, 152, 219, 0.1);
+}
+.post-content .user-mention:hover {
+  background: rgba(52, 152, 219, 0.2);
+}
 .post-content .attachment-placeholder { color: var(--meta-color); font-style: italic; }
 blockquote {
   background: var(--quote-bg); border-left: 4px solid var(--border-color); margin: 12px 0; padding: 10px 14px; color: var(--quote-color); font-size: 0.9rem;
