@@ -15,6 +15,13 @@
 			"*/10 * * * *"
 		]
 	},
+	"rules": [
+		{
+			"type": "Text",
+			"globs": ["**/*.css", "**/*.html", "**/static/*.js"],
+			"fallthrough": true
+		}
+	],
 	"d1_databases": [
 		{
 			"binding": "DB",

@@ -1,7 +1,7 @@
 import { handleSchedule } from './crawler.js';
 import { renderHome, renderThread, getThreadData } from './views.js';
-import stylesCSS from './static/styles.css?raw';
-import appJS from './static/app.js?raw';
+import stylesCSS from './static/styles.css';
+import appJS from './static/app.js';
 
 export default {
   // 定时任务入口
