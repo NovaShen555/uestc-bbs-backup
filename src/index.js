@@ -43,6 +43,22 @@ export default {
       return await getThreadData(env, threadId);
     }
 
+    // 路由: API 加载更多帖子
+    if (url.pathname === "/api/threads") {
+      const sort = url.searchParams.get("sort") || "created";
+      const offset = parseInt(url.searchParams.get("offset") || "0");
+      const limit = parseInt(url.searchParams.get("limit") || "30");
+
+      const orderBy = sort === "reply" ? "last_synced DESC" : "created_at DESC";
+      const { results } = await env.DB.prepare(
+        `SELECT * FROM threads ORDER BY ${orderBy} LIMIT ? OFFSET ?`
+      ).bind(limit, offset).all();
+
+      return new Response(JSON.stringify({ threads: results }), {
+        headers: { "content-type": "application/json;charset=utf-8" }
+      });
+    }
+
     // 路由: API 获取外部链接标题
     if (url.pathname === "/api/fetch-title") {
       const targetUrl = url.searchParams.get("url");

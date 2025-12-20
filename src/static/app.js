@@ -1,4 +1,7 @@
 let currentThreadId = null;
+let currentSort = 'created';
+let loadedThreads = 30;
+let isLoading = false;
 
 // 生成头像URL
 function getAvatarUrl(authorId) {
@@ -18,6 +21,9 @@ function getAvatarUrl(authorId) {
 })();
 
 document.addEventListener('DOMContentLoaded', () => {
+  const urlParams = new URLSearchParams(window.location.search);
+  currentSort = urlParams.get('sort') || 'created';
+
   // 主题切换
   document.getElementById('themeToggle').addEventListener('click', () => {
     const html = document.documentElement;
@@ -50,6 +56,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // 同步按钮
   document.getElementById('syncBtn').addEventListener('click', () => startSync());
+
+  // 无限滚动
+  const sidebar = document.querySelector('.sidebar-inner');
+  sidebar.addEventListener('scroll', () => {
+    if (isLoading) return;
+    const { scrollTop, scrollHeight, clientHeight } = sidebar;
+    if (scrollTop + clientHeight >= scrollHeight - 100) {
+      loadMoreThreads();
+    }
+  });
 
   // 检查 URL hash
   const hash = window.location.hash;
@@ -250,4 +266,49 @@ async function startSync(round = 1) {
     btn.textContent = "同步数据";
     output.textContent += nl + "> 完成！刷新页面查看最新数据。";
   }
+}
+
+async function loadMoreThreads() {
+  if (isLoading) return;
+  isLoading = true;
+
+  try {
+    const resp = await fetch(`/api/threads?sort=${currentSort}&offset=${loadedThreads}&limit=30`);
+    const data = await resp.json();
+
+    if (data.threads && data.threads.length > 0) {
+      const threadList = document.getElementById('threadList');
+      data.threads.forEach(t => {
+        const card = document.createElement('div');
+        card.className = 'thread-card';
+        card.dataset.id = t.thread_id;
+        card.innerHTML = `
+          <div class="thread-title">
+            <span class="thread-title-text">${t.subject}</span>
+            <span class="thread-id">#${t.thread_id}</span>
+          </div>
+          <div class="thread-meta">
+            <span>${t.author}</span>
+            <span>${formatTime(t.created_at)}</span>
+          </div>
+          <div class="thread-stats">
+            <span class="reply-count">${t.replies} 回复</span>
+            <span> · ${t.views || 0} 浏览</span>
+            ${t.last_synced ? `<span> · 最新: ${formatTime(t.last_synced)}</span>` : ''}
+          </div>
+        `;
+        threadList.appendChild(card);
+      });
+      loadedThreads += data.threads.length;
+    }
+  } catch (e) {
+    console.error('加载更多失败:', e);
+  } finally {
+    isLoading = false;
+  }
+}
+
+function formatTime(timestamp) {
+  if (!timestamp) return '';
+  return new Date(timestamp * 1000).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' });
 }

@@ -11,7 +11,7 @@ export async function renderHome(env, sort = "created") {
   // 根据排序参数选择 SQL
   const orderBy = sort === "reply" ? "last_synced DESC" : "created_at DESC";
   const { results } = await env.DB.prepare(
-    `SELECT * FROM threads ORDER BY ${orderBy} LIMIT 50`
+    `SELECT * FROM threads ORDER BY ${orderBy} LIMIT 30`
   ).all();
 
   // 获取最后同步时间
