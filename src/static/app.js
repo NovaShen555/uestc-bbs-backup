@@ -1,5 +1,13 @@
 let currentThreadId = null;
 
+// 生成头像URL
+function getAvatarUrl(authorId) {
+  if (!authorId) return '';
+  const id = String(authorId).padStart(6, '0');
+  const path = `000/${id.slice(0, 2)}/${id.slice(2, 4)}/${id.slice(4, 6)}`;
+  return `https://bbs.uestc.edu.cn/uc_server/data/avatar/${path}_avatar_middle.jpg`;
+}
+
 // 主题初始化
 (function initTheme() {
   const saved = localStorage.getItem('theme');
@@ -116,6 +124,7 @@ function renderThread(data) {
         <div class="post-card ${c.position === 1 ? 'is-landlord' : ''}" data-post-id="${c.post_id}">
           <div class="post-meta">
             <div class="author-info">
+              <img src="${getAvatarUrl(c.author_id)}" alt="${c.author}" class="avatar" onerror="this.style.display='none'">
               <span class="floor-tag">${c.position === 1 ? '楼主' : '#' + c.position}</span>
               <strong>${c.author}</strong>
             </div>
