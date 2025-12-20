@@ -106,9 +106,11 @@ export async function getThreadData(env, threadId) {
     comments: comments.map(c => {
       // 解析 raw_json 获取附件信息
       let attachments = [];
+      let authorId = null;
       try {
         const rawData = JSON.parse(c.raw_json || '{}');
         attachments = rawData.attachments || [];
+        authorId = rawData.author_id;
       } catch (e) {}
 
       // 构建附件ID映射
@@ -122,6 +124,7 @@ export async function getThreadData(env, threadId) {
 
       return {
         ...c,
+        author_id: authorId,
         post_date_fmt: formatTime(c.post_date),
         content_html
       };
