@@ -1,5 +1,7 @@
 import { handleSchedule } from './crawler.js';
 import { renderHome, renderThread, getThreadData } from './views.js';
+import stylesCSS from './static/styles.css';
+import appJS from './static/app.js';
 
 export default {
   // 定时任务入口
@@ -10,6 +12,14 @@ export default {
   // HTTP 入口
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
+
+    // 路由: 静态资源
+    if (url.pathname === "/static/styles.css") {
+      return new Response(stylesCSS, { headers: { "content-type": "text/css;charset=utf-8" } });
+    }
+    if (url.pathname === "/static/app.js") {
+      return new Response(appJS, { headers: { "content-type": "application/javascript;charset=utf-8" } });
+    }
 
     // 路由: 首页
     if (url.pathname === "/") {
