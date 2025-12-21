@@ -160,6 +160,7 @@ export default {
 
     // 路由: 手动触发同步 (流式输出日志)
     if (url.pathname === "/sync") {
+      const round = parseInt(url.searchParams.get("round") || "1");
       const { readable, writable } = new TransformStream();
       const writer = writable.getWriter();
       const encoder = new TextEncoder();
@@ -171,7 +172,7 @@ export default {
       };
 
       ctx.waitUntil(
-        handleSchedule(env, streamLog)
+        handleSchedule(env, streamLog, round)
           .then((result) => {
             if (result?.hasMore) {
               writer.write(encoder.encode("[SYNC_MORE] 还有更多内容待同步...\n"));

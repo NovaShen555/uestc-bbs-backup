@@ -278,7 +278,7 @@ async function startSync(round = 1) {
   let shouldContinue = false;
 
   try {
-    const response = await fetch('/sync');
+    const response = await fetch(`/sync?round=${round}`);
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
     let fullText = "";

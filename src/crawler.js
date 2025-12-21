@@ -15,79 +15,73 @@ async function processBatch(items, batchSize, handler) {
   }
 }
 
-export async function handleSchedule(env, log = console.log) {
-  await log("开始执行同步任务...");
-
-  // 获取数据库中最新的帖子ID
-  const latest = await env.DB.prepare("SELECT MAX(thread_id) as max_id FROM threads").first();
-  const latestId = latest?.max_id || 0;
-  await log(`数据库最新帖子ID: ${latestId}`);
-
-  let page = 1;
-  let allThreads = [];
-  let foundExisting = false;
-  let hasMoreNewThreads = false;
-  let apiLatestId = 0;
-
-  // 翻页获取，直到找到已有帖子（限制最多3页，避免请求过多）
-  while (!foundExisting && page <= 3) {
-    const topListUrl = `https://bbs.uestc.edu.cn/_/forum/toplist?idlist=newthread&page=${page}`;
-    await log(`正在请求 Toplist 第${page}页...`);
-
-    const listResp = await fetch(topListUrl, { headers: HEADERS(env) });
-    if (!listResp.ok) {
-      await log(`Toplist 请求失败: ${listResp.status}`);
-      break;
-    }
-
-    const listData = await listResp.json();
-    const threads = listData.data.newthread || [];
-
-    if (threads.length === 0) {
-      await log("没有更多帖子了");
-      break;
-    }
-
-    if (page === 1 && threads.length > 0) {
-      apiLatestId = threads[0].thread_id;
-    }
-
-    for (const t of threads) {
-      if (t.thread_id <= latestId) {
-        foundExisting = true;
-        break;
-      }
-      allThreads.push(t);
-    }
-
-    page++;
-  }
+export async function handleSchedule(env, log = console.log, round = 1) {
+  await log(round === 1 ? "开始执行同步任务..." : `开始第 ${round} 轮同步...`);
 
   let processedNewThreads = 0;
-  if (allThreads.length === 0) {
-    await log("没有发现新帖子");
-  } else {
-    // 限制最多处理 15 个新帖
-    const toProcess = allThreads.slice(0, 15);
-    hasMoreNewThreads = allThreads.length > 15;
-    await log(`共发现 ${allThreads.length} 个新帖，本次处理 ${toProcess.length} 个...`);
+  let hasMoreNewThreads = false;
 
-    // 批次处理，每批 MAX_CONCURRENT 个
-    await processBatch(toProcess, MAX_CONCURRENT, async (t) => {
-      try {
-        await processThread(env, t.thread_id, log);
-        processedNewThreads++;
-      } catch (e) {
-        await log(`处理帖子 ${t.thread_id} 失败: ${e.message}`);
+  // 只在第一轮检查新帖子
+  if (round === 1) {
+    // 获取数据库中最新的帖子ID
+    const latest = await env.DB.prepare("SELECT MAX(thread_id) as max_id FROM threads").first();
+    const latestId = latest?.max_id || 0;
+    await log(`数据库最新帖子ID: ${latestId}`);
+
+    let page = 1;
+    let allThreads = [];
+    let foundExisting = false;
+
+    // 翻页获取，直到找到已有帖子（限制最多3页，避免请求过多）
+    while (!foundExisting && page <= 3) {
+      const topListUrl = `https://bbs.uestc.edu.cn/_/forum/toplist?idlist=newthread&page=${page}`;
+      await log(`正在请求 Toplist 第${page}页...`);
+
+      const listResp = await fetch(topListUrl, { headers: HEADERS(env) });
+      if (!listResp.ok) {
+        await log(`Toplist 请求失败: ${listResp.status}`);
+        break;
       }
-    });
 
-    await log("新帖同步完成。");
-  }
+      const listData = await listResp.json();
+      const threads = listData.data.newthread || [];
 
-  // 回填检查：从最新ID往回检查100个，确保没有遗漏
-  if (apiLatestId > 0) {
-    await backfillCheck(env, apiLatestId, log);
+      if (threads.length === 0) {
+        await log("没有更多帖子了");
+        break;
+      }
+
+      for (const t of threads) {
+        if (t.thread_id <= latestId) {
+          foundExisting = true;
+          break;
+        }
+        allThreads.push(t);
+      }
+
+      page++;
+    }
+
+    if (allThreads.length === 0) {
+      await log("没有发现新帖子");
+    } else {
+      // 限制最多处理 15 个新帖
+      const toProcess = allThreads.slice(0, 15);
+      hasMoreNewThreads = allThreads.length > 15;
+      await log(`共发现 ${allThreads.length} 个新帖，本次处理 ${toProcess.length} 个...`);
+
+      // 批次处理，每批 MAX_CONCURRENT 个
+      await processBatch(toProcess, MAX_CONCURRENT, async (t) => {
+        try {
+          await processThread(env, t.thread_id, log);
+          processedNewThreads++;
+        } catch (e) {
+          await log(`处理帖子 ${t.thread_id} 失败: ${e.message}`);
+        }
+      });
+
+      await log("新帖同步完成。");
+    }
   }
 
   // 同步新回复
@@ -99,36 +93,16 @@ export async function handleSchedule(env, log = console.log) {
   return { hasMore, processedNewThreads, updatedReplies: updatedCount };
 }
 
-async function backfillCheck(env, apiLatestId, log) {
-  await log("开始回填检查...");
-  const checkStart = Math.max(1, apiLatestId - 100);
-
-  for (let id = apiLatestId; id >= checkStart; id--) {
-    const exists = await env.DB.prepare("SELECT 1 FROM threads WHERE thread_id = ?").bind(id).first();
-    if (exists) continue;
-
-    const missing = await env.DB.prepare("SELECT 1 FROM missing_threads WHERE thread_id = ?").bind(id).first();
-    if (missing) continue;
-
-    try {
-      await processThread(env, id, log);
-    } catch (e) {
-      await log(`回填检查 ${id} 失败: ${e.message}`);
-    }
-  }
-
-  await log("回填检查完成。");
-}
 
 async function syncNewReplies(env, log) {
   await log("开始同步新回复...");
 
   let page = 1;
   let totalUpdated = 0;
-  let foundEmptyPage = false;  // 是否找到一整页都不需要更新
+  let foundEmptyPage = false;
 
   // 翻页检查，直到找到一整页都不需要更新
-  while (page <= 3) {
+  while (page <= 5) {
     const url = `https://bbs.uestc.edu.cn/_/forum/toplist?idlist=newreply&page=${page}`;
     await log(`正在请求 newreply 第${page}页...`);
 
@@ -145,28 +119,29 @@ async function syncNewReplies(env, log) {
       break;
     }
 
-    let pageNeedUpdate = 0;  // 这一页需要更新的数量
+    let pageNeedUpdate = 0;
 
+    // 批次处理，每批 MAX_CONCURRENT 个
+    const updateTasks = [];
     for (const t of threads) {
       const dbThread = await env.DB.prepare("SELECT replies FROM threads WHERE thread_id = ?").bind(t.thread_id).first();
       const dbReplies = dbThread?.replies ?? -1;
 
       if (t.replies > dbReplies) {
         pageNeedUpdate++;
-
-        // 达到本次更新限制，跳过执行但继续计数
-        if (totalUpdated >= 8) {
-          continue;
-        }
-
-        if (dbReplies < 0) {
-          await processThread(env, t.thread_id, log);
-        } else {
-          await updateThreadComments(env, t.thread_id, t.replies, dbReplies, log);
-        }
-        totalUpdated++;
+        updateTasks.push({ threadId: t.thread_id, apiReplies: t.replies, dbReplies });
       }
     }
+
+    // 执行所有更新任务
+    await processBatch(updateTasks, MAX_CONCURRENT, async (task) => {
+      if (task.dbReplies < 0) {
+        await processThread(env, task.threadId, log);
+      } else {
+        await updateThreadComments(env, task.threadId, task.apiReplies, task.dbReplies, log);
+      }
+      totalUpdated++;
+    });
 
     // 整页无需更新 → 同步完成
     if (pageNeedUpdate === 0) {
